@@ -1,0 +1,59 @@
+{
+  "common": {
+    "appName": "MakeYourText",
+    "subtitle": "トーンと音声を組み合わせたリライトサービス",
+    "submit": "生成",
+    "loading": "生成中...",
+    "copy": "コピー",
+    "save": "保存",
+    "play": "プレビュー",
+    "pause": "一時停止",
+    "stop": "停止",
+    "upgrade": "アップグレード"
+  },
+  "form": {
+    "textInput": "文章入力",
+    "textPlaceholder": "リライトする文章を入力してください...",
+    "toneSelect": "トーン選択",
+    "audienceSelect": "誰に (読者/年齢)",
+    "relationshipSelect": "関係選択 (オプション)",
+    "relationshipNone": "選択なし",
+    "purposeSelect": "どのような文章 (形式)",
+    "strengthCalm": "強度: 落ち着き ↔ 強さ",
+    "strengthSoft": "強度: 柔らかさ ↔ 断固",
+    "resultOptions": "結果オプション",
+    "formatLabel": "形式:",
+    "formatParagraph": "段落形式",
+    "formatBullet": "要点箇条書き",
+    "ambiguityWarning": "誤解の可能性のある表現の警告:"
+  },
+  "result": {
+    "title": "リライト結果",
+    "short": "短く",
+    "standard": "標準",
+    "long": "詳細",
+    "voicePreset": "音声プリセット:",
+    "rate": "速度",
+    "pitch": "高低",
+    "emotion": "感情強度",
+    "sentenceListen": "この文章を聞く"
+  },
+  "plan": {
+    "free": "無料",
+    "pro": "個人有料",
+    "business": "チーム/企業"
+  },
+  "safety": {
+    "warning": "安全性チェック失敗",
+    "blocked": "危険な表現が含まれています。安全な文章に修正してください。",
+    "suggestion": "提案"
+  },
+  "error": {
+    "rewriteFailed": "リライト中にエラーが発生しました。",
+    "copyFailed": "コピーに失敗しました。",
+    "copySuccess": "コピーされました。",
+    "saveSuccess": "保存されました。",
+    "noResults": "結果がありません。別の設定でお試しください。"
+  }
+}
+

@@ -1,0 +1,185 @@
+.rewrite-results {
+  margin-top: 32px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.results-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.result-variant {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+}
+
+.variant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.variant-type {
+  font-weight: 600;
+  color: #4a90e2;
+  font-size: 14px;
+}
+
+.variant-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.play-btn,
+.copy-btn,
+.save-btn {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.play-btn {
+  background: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+.play-btn:hover:not(:disabled) {
+  background: #357abd;
+}
+
+.play-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.copy-btn:hover,
+.save-btn:hover {
+  background: #f5f5f5;
+  border-color: #4a90e2;
+}
+
+.variant-text {
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  line-height: 1.6;
+  color: #333;
+  font-size: 15px;
+}
+
+.sentence-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sentence-row:last-child {
+  margin-bottom: 0;
+}
+
+.sentence-text {
+  flex: 1;
+}
+
+.sentence-play-btn {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.sentence-play-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #4a90e2;
+}
+
+.sentence-play-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voice-controls {
+  border-top: 1px solid #eee;
+  padding-top: 16px;
+}
+
+.voice-preset-select {
+  margin-bottom: 12px;
+}
+
+.voice-preset-select label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #666;
+}
+
+.voice-preset-select select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  background: white;
+}
+
+.voice-slider {
+  margin-bottom: 12px;
+}
+
+.voice-slider label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #666;
+}
+
+.voice-slider input[type="range"] {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #ddd;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.voice-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #4a90e2;
+  cursor: pointer;
+}
+
+.voice-slider input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #4a90e2;
+  cursor: pointer;
+  border: none;
+}
+

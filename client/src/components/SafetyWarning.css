@@ -1,0 +1,38 @@
+.safety-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.warning-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.warning-content {
+  flex: 1;
+}
+
+.warning-title {
+  font-weight: 600;
+  color: #856404;
+  margin-bottom: 4px;
+}
+
+.warning-message {
+  color: #856404;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.warning-suggestion {
+  color: #856404;
+  font-size: 13px;
+  font-style: italic;
+}
+

@@ -1,0 +1,59 @@
+{
+  "common": {
+    "appName": "MakeYourText",
+    "subtitle": "톤과 목소리를 결합한 리라이트 서비스",
+    "submit": "생성",
+    "loading": "생성 중...",
+    "copy": "복사",
+    "save": "저장",
+    "play": "미리듣기",
+    "pause": "일시정지",
+    "stop": "정지",
+    "upgrade": "업그레이드"
+  },
+  "form": {
+    "textInput": "문장 입력",
+    "textPlaceholder": "리라이트할 문장을 입력하세요...",
+    "toneSelect": "톤 선택",
+    "audienceSelect": "누구에게 (독자/연령)",
+    "relationshipSelect": "관계 선택 (선택사항)",
+    "relationshipNone": "선택 안 함",
+    "purposeSelect": "어떤 글 (형식)",
+    "strengthCalm": "강도: 차분함 ↔ 강함",
+    "strengthSoft": "강도: 부드러움 ↔ 단호함",
+    "resultOptions": "결과 옵션",
+    "formatLabel": "형식:",
+    "formatParagraph": "문단형",
+    "formatBullet": "핵심 bullet",
+    "ambiguityWarning": "오해 가능 표현 경고:"
+  },
+  "result": {
+    "title": "리라이트 결과",
+    "short": "짧게",
+    "standard": "표준",
+    "long": "자세히",
+    "voicePreset": "보이스 프리셋:",
+    "rate": "속도",
+    "pitch": "높낮이",
+    "emotion": "감정 강도",
+    "sentenceListen": "이 문장 듣기"
+  },
+  "plan": {
+    "free": "무료",
+    "pro": "개인 유료",
+    "business": "팀/기업"
+  },
+  "safety": {
+    "warning": "안전 검사 실패",
+    "blocked": "위험한 표현이 포함되어 있습니다. 안전한 문장으로 수정해주세요.",
+    "suggestion": "제안"
+  },
+  "error": {
+    "rewriteFailed": "리라이트 중 오류가 발생했습니다.",
+    "copyFailed": "복사에 실패했습니다.",
+    "copySuccess": "복사되었습니다.",
+    "saveSuccess": "저장되었습니다.",
+    "noResults": "결과가 없습니다. 다른 설정으로 시도해보세요."
+  }
+}
+

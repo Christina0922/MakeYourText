@@ -1,0 +1,16 @@
+{
+  "name": "makeyourtext",
+  "version": "1.0.0",
+  "description": "Text rewrite service with tone presets and voice preview",
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm start",
+    "build:server": "cd server && npm run build",
+    "build:client": "cd client && npm run build",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "keywords": ["rewrite", "text", "tone", "voice"],
+  "author": "",
+  "license": "ISC"
+}
+

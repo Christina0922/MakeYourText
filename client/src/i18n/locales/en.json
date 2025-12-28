@@ -1,0 +1,59 @@
+{
+  "common": {
+    "appName": "MakeYourText",
+    "subtitle": "Text rewrite service with tone and voice",
+    "submit": "Generate",
+    "loading": "Generating...",
+    "copy": "Copy",
+    "save": "Save",
+    "play": "Preview",
+    "pause": "Pause",
+    "stop": "Stop",
+    "upgrade": "Upgrade"
+  },
+  "form": {
+    "textInput": "Enter text",
+    "textPlaceholder": "Enter the text to rewrite...",
+    "toneSelect": "Select tone",
+    "audienceSelect": "To whom (Reader/Age)",
+    "relationshipSelect": "Relationship (Optional)",
+    "relationshipNone": "None",
+    "purposeSelect": "What kind of text (Format)",
+    "strengthCalm": "Intensity: Calm ↔ Strong",
+    "strengthSoft": "Intensity: Soft ↔ Firm",
+    "resultOptions": "Result options",
+    "formatLabel": "Format:",
+    "formatParagraph": "Paragraph",
+    "formatBullet": "Key bullet points",
+    "ambiguityWarning": "Ambiguity warning:"
+  },
+  "result": {
+    "title": "Rewrite result",
+    "short": "Short",
+    "standard": "Standard",
+    "long": "Detailed",
+    "voicePreset": "Voice preset:",
+    "rate": "Rate",
+    "pitch": "Pitch",
+    "emotion": "Emotion intensity",
+    "sentenceListen": "Listen to this sentence"
+  },
+  "plan": {
+    "free": "Free",
+    "pro": "Personal Pro",
+    "business": "Team/Business"
+  },
+  "safety": {
+    "warning": "Safety check failed",
+    "blocked": "The text contains dangerous expressions. Please modify to a safe sentence.",
+    "suggestion": "Suggestion"
+  },
+  "error": {
+    "rewriteFailed": "An error occurred during rewrite.",
+    "copyFailed": "Copy failed.",
+    "copySuccess": "Copied.",
+    "saveSuccess": "Saved.",
+    "noResults": "No results. Please try different settings."
+  }
+}
+
