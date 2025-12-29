@@ -1,8 +1,8 @@
 import { TonePreset, ToneCategory, AudienceLevel, PurposeType, VoicePreset, Relationship } from '../types/index.js';
 
-// 톤 프리셋 데이터
+// 톤 프리셋 데이터 - 기본6 + 특수3
 export const TONE_PRESETS: TonePreset[] = [
-  // 기본 프리셋
+  // 기본 6개
   {
     id: 'cultured',
     label: '교양 있게',
@@ -22,10 +22,10 @@ export const TONE_PRESETS: TonePreset[] = [
     defaultStrength: { calmToStrong: 60, softToFirm: 70 }
   },
   {
-    id: 'humorous',
-    label: '유머 있게',
+    id: 'warm',
+    label: '따뜻하게 (배려)',
     category: ToneCategory.BASE,
-    defaultStrength: { calmToStrong: 25, softToFirm: 15 }
+    defaultStrength: { calmToStrong: 25, softToFirm: 25 }
   },
   {
     id: 'apology',
@@ -33,35 +33,16 @@ export const TONE_PRESETS: TonePreset[] = [
     category: ToneCategory.APOLOGY,
     defaultStrength: { calmToStrong: 15, softToFirm: 20 }
   },
-  // 새로운 톤 프리셋
   {
-    id: 'warm',
-    label: '따뜻하게 (배려)',
+    id: 'humorous',
+    label: '유머 있게',
     category: ToneCategory.BASE,
-    defaultStrength: { calmToStrong: 25, softToFirm: 25 }
+    defaultStrength: { calmToStrong: 25, softToFirm: 15 }
   },
-  {
-    id: 'casual',
-    label: '캐주얼 (친근)',
-    category: ToneCategory.BASE,
-    defaultStrength: { calmToStrong: 20, softToFirm: 15 }
-  },
-  {
-    id: 'formal',
-    label: '포멀 (공식)',
-    category: ToneCategory.BASE,
-    defaultStrength: { calmToStrong: 40, softToFirm: 50 }
-  },
-  // 강경 프리셋
-  {
-    id: 'strong',
-    label: '강경(시정요구/기한 명시)',
-    category: ToneCategory.STRONG,
-    defaultStrength: { calmToStrong: 80, softToFirm: 85 }
-  },
+  // 특수 3개
   {
     id: 'warning',
-    label: '경고/시정요구',
+    label: '경고/시정요구 (기한 명시)',
     category: ToneCategory.STRONG,
     defaultStrength: { calmToStrong: 75, softToFirm: 80 }
   },
@@ -72,10 +53,10 @@ export const TONE_PRESETS: TonePreset[] = [
     defaultStrength: { calmToStrong: 85, softToFirm: 90 }
   },
   {
-    id: 'ultimatum',
-    label: '최후통첩 톤',
-    category: ToneCategory.STRONG,
-    defaultStrength: { calmToStrong: 90, softToFirm: 95 }
+    id: 'notice-formal',
+    label: '공지/안내 (공식 포맷)',
+    category: ToneCategory.BASE,
+    defaultStrength: { calmToStrong: 40, softToFirm: 50 }
   }
 ];
 
@@ -99,21 +80,13 @@ export const RELATIONSHIPS: Relationship[] = [
   { id: 'client', label: '거래처' }
 ];
 
-// 목적/형식
+// 목적 버튼 5개
 export const PURPOSE_TYPES: PurposeType[] = [
-  { id: 'kakaotalk', label: '카톡/문자' },
-  { id: 'email', label: '이메일' },
-  { id: 'notice', label: '공지문(학원/학교/모임)' },
-  { id: 'review', label: '후기/추천사' },
-  { id: 'request', label: '요청/문의/민원' },
-  { id: 'apology', label: '사과문' },
-  { id: 'introduction', label: '자기소개/소개글' },
-  { id: 'report', label: '보고/요약' },
-  // 카테고리별 기본 틀
-  { id: 'parent-notice', label: '학부모 공지 (결석/보강/숙제/상담/방학특강)' },
-  { id: 'company-email', label: '회사 메일 (요청/확인/리마인드/사과/감사)' },
-  { id: 'student-assignment', label: '학생 과제 (요약/소감/발표 대본)' },
-  { id: 'customer-service', label: '고객 응대 (문의 답변/환불/지연 안내)' }
+  { id: 'request', label: '요청' },
+  { id: 'notice', label: '안내/공지' },
+  { id: 'apology', label: '사과' },
+  { id: 'review', label: '후기/감사' },
+  { id: 'complaint', label: '항의/시정요구' }
 ];
 
 // 보이스 프리셋
@@ -154,4 +127,3 @@ export const VOICE_PRESETS: VoicePreset[] = [
     style: 'kids'
   }
 ];
-

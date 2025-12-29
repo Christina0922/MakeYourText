@@ -183,3 +183,20 @@
   border: none;
 }
 
+.apply-btn {
+  width: 100%;
+  padding: 10px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
+}
+
+.apply-btn:hover {
+  background: #218838;
+}

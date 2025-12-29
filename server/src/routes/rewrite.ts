@@ -5,6 +5,10 @@ import { checkUsageLimit, incrementUsage } from '../services/planLimits.js';
 
 const router = express.Router();
 
+// DEV 모드: 환경변수로 제한 우회
+const BYPASS_LIMITS = process.env.BYPASS_LIMITS === 'true' || 
+                      process.env.NODE_ENV === 'development';
+
 /**
  * POST /api/rewrite
  * 텍스트 리라이트 요청
@@ -18,22 +22,25 @@ router.post('/', async (req, res) => {
       request.plan = 'free';
     }
     
-    // 사용량 체크 (실제로는 userId를 세션/토큰에서 가져옴)
-    const userId = req.headers['x-user-id'] as string || 'anonymous';
-    const usageCheck = checkUsageLimit(userId, request.plan);
-    
-    if (!usageCheck.allowed) {
-      return res.status(429).json({
-        error: 'Usage limit exceeded',
-        reason: usageCheck.reason
-      });
+    // 사용량 체크 (DEV 모드에서는 우회)
+    if (!BYPASS_LIMITS) {
+      const userId = req.headers['x-user-id'] as string || 'anonymous';
+      const usageCheck = checkUsageLimit(userId, request.plan);
+      
+      if (!usageCheck.allowed) {
+        return res.status(429).json({
+          error: 'Usage limit exceeded',
+          reason: usageCheck.reason
+        });
+      }
     }
     
     // 리라이트 실행
     const result = rewriteText(request);
     
-    // 사용량 증가
-    if (!result.safety.blocked && result.variants.length > 0) {
+    // 사용량 증가 (DEV 모드에서는 증가하지 않음)
+    if (!BYPASS_LIMITS && !result.safety.blocked && result.variants.length > 0) {
+      const userId = req.headers['x-user-id'] as string || 'anonymous';
       incrementUsage(userId);
     }
     
@@ -48,4 +55,3 @@ router.post('/', async (req, res) => {
 });
 
 export default router;
-

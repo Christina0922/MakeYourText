@@ -35,6 +35,54 @@
   box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
 }
 
+/* 목적 버튼 */
+.purpose-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.purpose-btn {
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.purpose-btn:hover {
+  background: #f5f5f5;
+  border-color: #4a90e2;
+}
+
+.purpose-btn.active {
+  background: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+/* 톤 그룹 */
+.tone-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tone-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tone-subgroup-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+}
+
 .tone-presets {
   display: flex;
   flex-wrap: wrap;
@@ -68,6 +116,63 @@
 
 .tone-preset-btn.strong-tone.active {
   background: #ff6b6b;
+  color: white;
+}
+
+/* 길이 옵션 */
+.length-options {
+  display: flex;
+  gap: 8px;
+}
+
+.length-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.length-btn:hover {
+  background: #f5f5f5;
+  border-color: #4a90e2;
+}
+
+.length-btn.active {
+  background: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+/* 형식 옵션 */
+.format-options {
+  display: flex;
+  gap: 8px;
+}
+
+.format-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.format-btn:hover {
+  background: #f5f5f5;
+  border-color: #4a90e2;
+}
+
+.format-btn.active {
+  background: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
 }
 
 .form-select {
@@ -152,7 +257,7 @@
   font-size: 13px;
   font-weight: 500;
   color: #666;
-  min-width: 120px;
+  min-width: 200px;
 }
 
 .option-buttons {
@@ -225,4 +330,3 @@
 .toggle-switch input:checked + .toggle-slider:before {
   transform: translateX(20px);
 }
-

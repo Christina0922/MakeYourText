@@ -34,10 +34,22 @@ export interface PurposeType {
   label: string;
 }
 
-// 강도 설정
+// 강도 설정 (부드러움 ↔ 단호함만)
 export interface Strength {
-  calmToStrong: number;
-  softToFirm: number;
+  softToFirm: number;   // 0-100
+}
+
+// 길이 옵션
+export enum LengthOption {
+  SHORT = 'short',      // 짧게 (1~2문장)
+  STANDARD = 'standard', // 표준
+  LONG = 'long'        // 자세히 (근거/단계 포함)
+}
+
+// 형식 옵션
+export enum FormatOption {
+  MESSAGE = 'message',  // 문자/카톡용
+  EMAIL = 'email'       // 이메일/공문용
 }
 
 // 보이스 프리셋
@@ -60,16 +72,19 @@ export interface VoiceControls {
 export interface ResultOptions {
   format: 'bullet' | 'paragraph'; // 핵심 bullet / 문단형
   ambiguityWarning: boolean; // 오해 가능 표현 경고
+  autoIncludeDetails: boolean; // 기한/요청사항/근거/다음 단계 자동 포함
 }
 
 // 리라이트 요청
 export interface RewriteRequest {
   text: string;
   tonePresetId: string;
+  purposeTypeId: string;  // 목적 버튼
   audienceLevelId: string;
   relationshipId?: string; // 관계 선택 (선택적)
-  purposeTypeId: string;
-  strength: Strength;
+  length: LengthOption;    // 길이 옵션
+  format: FormatOption;    // 형식 옵션
+  strength: Strength;      // 강도 (부드러움 ↔ 단호함)
   resultOptions?: ResultOptions;
   plan: Plan;
 }
@@ -92,4 +107,3 @@ export interface RewriteResult {
   variants: RewriteVariant[];
   safety: SafetyCheck;
 }
-

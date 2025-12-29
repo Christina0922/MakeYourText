@@ -1,9 +1,25 @@
 import { Plan, UsageLimits } from '../types/index.js';
 
+// DEV 모드: 환경변수로 제한 우회
+const BYPASS_LIMITS = process.env.BYPASS_LIMITS === 'true' || 
+                      process.env.NODE_ENV === 'development';
+
 /**
  * 요금제별 사용량 제한
  */
 export function getPlanLimits(plan: Plan): UsageLimits {
+  // DEV 모드에서는 PRO 제한을 반환 (모든 제한 해제)
+  if (BYPASS_LIMITS) {
+    return {
+      dailyRewrites: 999999,
+      weeklyRewrites: 999999,
+      maxVariants: 3,
+      maxVoices: 20,
+      voicePlayLimit: 999999,
+      historyLimit: 999999
+    };
+  }
+
   switch (plan) {
     case Plan.FREE:
       return {
@@ -46,6 +62,11 @@ export function getPlanLimits(plan: Plan): UsageLimits {
 const usageStore = new Map<string, { daily: number; weekly: number; lastReset: Date }>();
 
 export function checkUsageLimit(userId: string, plan: Plan): { allowed: boolean; reason?: string } {
+  // DEV 모드: 모든 제한 우회
+  if (BYPASS_LIMITS) {
+    return { allowed: true };
+  }
+
   const limits = getPlanLimits(plan);
   const now = new Date();
   
@@ -69,10 +90,14 @@ export function checkUsageLimit(userId: string, plan: Plan): { allowed: boolean;
 }
 
 export function incrementUsage(userId: string) {
+  // DEV 모드에서는 사용량 증가하지 않음
+  if (BYPASS_LIMITS) {
+    return;
+  }
+
   const usage = usageStore.get(userId);
   if (usage) {
     usage.daily++;
     usage.weekly++;
   }
 }
-

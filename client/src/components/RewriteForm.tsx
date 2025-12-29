@@ -6,6 +6,8 @@ import {
   PurposeType,
   Relationship,
   Strength,
+  LengthOption,
+  FormatOption,
   ResultOptions,
   Plan
 } from '../types';
@@ -17,9 +19,11 @@ interface RewriteFormProps {
   onSubmit: (request: {
     text: string;
     tonePresetId: string;
+    purposeTypeId: string;
     audienceLevelId: string;
     relationshipId?: string;
-    purposeTypeId: string;
+    length: LengthOption;
+    format: FormatOption;
     strength: Strength;
     resultOptions?: ResultOptions;
   }) => void;
@@ -34,48 +38,50 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
   const { t } = useTranslation();
   const [text, setText] = useState('');
   const [tonePresets, setTonePresets] = useState<TonePreset[]>([]);
+  const [purposeTypes, setPurposeTypes] = useState<PurposeType[]>([]);
   const [audienceLevels, setAudienceLevels] = useState<AudienceLevel[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
-  const [purposeTypes, setPurposeTypes] = useState<PurposeType[]>([]);
   
+  const [selectedPurpose, setSelectedPurpose] = useState<string>('');
   const [selectedTone, setSelectedTone] = useState<string>('');
   const [selectedAudience, setSelectedAudience] = useState<string>('');
   const [selectedRelationship, setSelectedRelationship] = useState<string>('');
-  const [selectedPurpose, setSelectedPurpose] = useState<string>('');
+  const [selectedLength, setSelectedLength] = useState<LengthOption>(LengthOption.STANDARD);
+  const [selectedFormat, setSelectedFormat] = useState<FormatOption>(FormatOption.MESSAGE);
   
   const [strength, setStrength] = useState<Strength>({
-    calmToStrong: 50,
     softToFirm: 50
   });
   
   const [resultOptions, setResultOptions] = useState<ResultOptions>({
     format: 'paragraph',
-    ambiguityWarning: false
+    ambiguityWarning: false,
+    autoIncludeDetails: false
   });
 
   useEffect(() => {
     // 프리셋 로드
     Promise.all([
+      api.getPurposeTypes(),
       api.getTonePresets(),
       api.getAudienceLevels(),
-      api.getRelationships(),
-      api.getPurposeTypes()
-    ]).then(([tones, audience, rels, purposes]) => {
+      api.getRelationships()
+    ]).then(([purposes, tones, audience, rels]) => {
+      setPurposeTypes(purposes);
       setTonePresets(tones);
       setAudienceLevels(audience);
       setRelationships(rels);
-      setPurposeTypes(purposes);
       
       // 기본값 설정
+      if (purposes.length > 0) {
+        setSelectedPurpose(purposes[0].id);
+      }
       if (tones.length > 0) {
         setSelectedTone(tones[0].id);
-        setStrength(tones[0].defaultStrength);
+        setStrength({ softToFirm: tones[0].defaultStrength.softToFirm });
       }
       if (audience.length > 0) {
         setSelectedAudience(audience[audience.length - 1].id); // 성인 기본
-      }
-      if (purposes.length > 0) {
-        setSelectedPurpose(purposes[0].id);
       }
     });
   }, []);
@@ -84,25 +90,31 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
     setSelectedTone(toneId);
     const tone = tonePresets.find(t => t.id === toneId);
     if (tone) {
-      setStrength(tone.defaultStrength);
+      setStrength({ softToFirm: tone.defaultStrength.softToFirm });
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || !selectedTone || !selectedAudience || !selectedPurpose) {
+    if (!text.trim() || !selectedTone || !selectedPurpose || !selectedAudience) {
       return;
     }
     onSubmit({
       text: text.trim(),
       tonePresetId: selectedTone,
+      purposeTypeId: selectedPurpose,
       audienceLevelId: selectedAudience,
       relationshipId: selectedRelationship || undefined,
-      purposeTypeId: selectedPurpose,
+      length: selectedLength,
+      format: selectedFormat,
       strength,
       resultOptions
     });
   };
+
+  // 기본 톤과 특수 톤 분리
+  const baseTones = tonePresets.filter(t => t.category === 'base' || t.category === 'apology');
+  const specialTones = tonePresets.filter(t => t.category === 'strong' || t.id === 'notice-formal');
 
   return (
     <form className="rewrite-form" onSubmit={handleSubmit}>
@@ -118,22 +130,61 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
         />
       </div>
 
+      {/* 목적 버튼 5개 */}
       <div className="form-section">
-        <label className="form-label">{t('form.toneSelect')}</label>
-        <div className="tone-presets">
-          {tonePresets.map((tone) => (
+        <label className="form-label">목적</label>
+        <div className="purpose-buttons">
+          {purposeTypes.map((purpose) => (
             <button
-              key={tone.id}
+              key={purpose.id}
               type="button"
-              className={`tone-preset-btn ${selectedTone === tone.id ? 'active' : ''} ${tone.category === 'strong' ? 'strong-tone' : ''}`}
-              onClick={() => handleToneChange(tone.id)}
+              className={`purpose-btn ${selectedPurpose === purpose.id ? 'active' : ''}`}
+              onClick={() => setSelectedPurpose(purpose.id)}
             >
-              {tone.label}
+              {purpose.label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* 톤 선택 - 기본 6개 + 특수 3개 */}
+      <div className="form-section">
+        <label className="form-label">{t('form.toneSelect')}</label>
+        <div className="tone-group">
+          <div className="tone-subgroup">
+            <div className="tone-subgroup-label">기본</div>
+            <div className="tone-presets">
+              {baseTones.map((tone) => (
+                <button
+                  key={tone.id}
+                  type="button"
+                  className={`tone-preset-btn ${selectedTone === tone.id ? 'active' : ''}`}
+                  onClick={() => handleToneChange(tone.id)}
+                >
+                  {tone.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="tone-subgroup">
+            <div className="tone-subgroup-label">특수</div>
+            <div className="tone-presets">
+              {specialTones.map((tone) => (
+                <button
+                  key={tone.id}
+                  type="button"
+                  className={`tone-preset-btn strong-tone ${selectedTone === tone.id ? 'active' : ''}`}
+                  onClick={() => handleToneChange(tone.id)}
+                >
+                  {tone.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 독자/연령 드롭다운 */}
       <div className="form-section">
         <label className="form-label">{t('form.audienceSelect')}</label>
         <select
@@ -150,6 +201,7 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
         </select>
       </div>
 
+      {/* 관계 선택 (선택사항) */}
       <div className="form-section">
         <label className="form-label">{t('form.relationshipSelect')}</label>
         <select
@@ -166,50 +218,71 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
         </select>
       </div>
 
+      {/* 길이 옵션 3개 */}
       <div className="form-section">
-        <label className="form-label">{t('form.purposeSelect')}</label>
-        <select
-          className="form-select"
-          value={selectedPurpose}
-          onChange={(e) => setSelectedPurpose(e.target.value)}
-          required
-        >
-          {purposeTypes.map((purpose) => (
-            <option key={purpose.id} value={purpose.id}>
-              {purpose.label}
-            </option>
-          ))}
-        </select>
+        <label className="form-label">길이</label>
+        <div className="length-options">
+          <button
+            type="button"
+            className={`length-btn ${selectedLength === LengthOption.SHORT ? 'active' : ''}`}
+            onClick={() => setSelectedLength(LengthOption.SHORT)}
+          >
+            짧게 (1~2문장)
+          </button>
+          <button
+            type="button"
+            className={`length-btn ${selectedLength === LengthOption.STANDARD ? 'active' : ''}`}
+            onClick={() => setSelectedLength(LengthOption.STANDARD)}
+          >
+            표준
+          </button>
+          <button
+            type="button"
+            className={`length-btn ${selectedLength === LengthOption.LONG ? 'active' : ''}`}
+            onClick={() => setSelectedLength(LengthOption.LONG)}
+          >
+            자세히 (근거/단계 포함)
+          </button>
+        </div>
       </div>
 
+      {/* 형식 토글 2개 */}
       <div className="form-section">
-        <label className="form-label">
-          {t('form.strengthCalm')} ({strength.calmToStrong})
-        </label>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={strength.calmToStrong}
-          onChange={(e) => setStrength({ ...strength, calmToStrong: Number(e.target.value) })}
-          className="form-slider"
-        />
+        <label className="form-label">형식</label>
+        <div className="format-options">
+          <button
+            type="button"
+            className={`format-btn ${selectedFormat === FormatOption.MESSAGE ? 'active' : ''}`}
+            onClick={() => setSelectedFormat(FormatOption.MESSAGE)}
+          >
+            문자/카톡용
+          </button>
+          <button
+            type="button"
+            className={`format-btn ${selectedFormat === FormatOption.EMAIL ? 'active' : ''}`}
+            onClick={() => setSelectedFormat(FormatOption.EMAIL)}
+          >
+            이메일/공문용
+          </button>
+        </div>
       </div>
 
+      {/* 강도 슬라이더 1개 (부드러움 ↔ 단호함) */}
       <div className="form-section">
         <label className="form-label">
-          {t('form.strengthSoft')} ({strength.softToFirm})
+          강도: 부드러움 ↔ 단호함 ({strength.softToFirm})
         </label>
         <input
           type="range"
           min="0"
           max="100"
           value={strength.softToFirm}
-          onChange={(e) => setStrength({ ...strength, softToFirm: Number(e.target.value) })}
+          onChange={(e) => setStrength({ softToFirm: Number(e.target.value) })}
           className="form-slider"
         />
       </div>
 
+      {/* 결과 옵션 */}
       <div className="form-section">
         <label className="form-label">{t('form.resultOptions')}</label>
         <div className="result-options">
@@ -243,6 +316,18 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
               <span className="toggle-slider"></span>
             </label>
           </div>
+          {/* 안전장치 체크박스 */}
+          <div className="option-group">
+            <label className="option-label">기한/요청사항/근거/다음 단계 자동 포함</label>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={resultOptions.autoIncludeDetails}
+                onChange={(e) => setResultOptions({ ...resultOptions, autoIncludeDetails: e.target.checked })}
+              />
+              <span className="toggle-slider"></span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -258,4 +343,3 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
 };
 
 export default RewriteForm;
-

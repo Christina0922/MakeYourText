@@ -9,7 +9,8 @@ import {
   RewriteResult
 } from '../types';
 
-const API_BASE_URL = (typeof process !== 'undefined' && process.env?.REACT_APP_API_URL) || 'http://localhost:5000/api';
+// 환경변수로 서버 주소 읽기 (REACT_APP_API_BASE_URL 사용)
+const API_BASE_URL = (typeof process !== 'undefined' && process.env?.REACT_APP_API_BASE_URL) || 'http://localhost:5000/api';
 
 export const api = {
   // 프리셋 조회
@@ -42,6 +43,22 @@ export const api = {
   rewrite: async (request: RewriteRequest): Promise<RewriteResult> => {
     const response = await axios.post(`${API_BASE_URL}/rewrite`, request);
     return response.data;
+  },
+
+  // TTS 요청 (서버 기반)
+  generateTts: async (params: {
+    text: string;
+    voicePreset: string;
+    rate: number;
+    pitch: number;
+    emotion: number;
+    language?: string;
+  }): Promise<Blob> => {
+    const response = await axios.post(
+      `${API_BASE_URL}/tts`,
+      params,
+      { responseType: 'blob' }
+    );
+    return response.data;
   }
 };
-

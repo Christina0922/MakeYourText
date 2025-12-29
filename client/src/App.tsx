@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plan, RewriteResult, Strength } from './types';
+import { Plan, RewriteResult, Strength, LengthOption, FormatOption } from './types';
 import { api } from './services/api';
 import RewriteForm from './components/RewriteForm';
 import RewriteResultComponent from './components/RewriteResult';
@@ -9,9 +9,14 @@ import PlanBadge from './components/PlanBadge';
 import LanguageSelector from './components/LanguageSelector';
 import './App.css';
 
+// DEV 모드: 개발/테스트 단계에서는 항상 PRO로 동작
+const IS_DEV = process.env.NODE_ENV === 'development' || 
+               (typeof process !== 'undefined' && process.env?.REACT_APP_DEV_MODE === 'true');
+
 function App() {
   const { t } = useTranslation();
-  const [plan, setPlan] = useState<Plan>(Plan.FREE);
+  // DEV 모드에서는 항상 PRO로 시작
+  const [plan, setPlan] = useState<Plan>(IS_DEV ? Plan.PRO : Plan.FREE);
   const [result, setResult] = useState<RewriteResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,9 +24,11 @@ function App() {
   const handleSubmit = async (request: {
     text: string;
     tonePresetId: string;
+    purposeTypeId: string;
     audienceLevelId: string;
     relationshipId?: string;
-    purposeTypeId: string;
+    length: LengthOption;
+    format: FormatOption;
     strength: Strength;
     resultOptions?: any;
   }) => {
@@ -30,14 +37,16 @@ function App() {
     setResult(null);
 
     try {
+      // DEV 모드에서는 항상 PRO로 요청
+      const effectivePlan = IS_DEV ? Plan.PRO : plan;
       const rewriteRequest = {
         ...request,
-        plan
+        plan: effectivePlan
       };
       const response = await api.rewrite(rewriteRequest);
       setResult(response);
     } catch (err: any) {
-      setError(err.response?.data?.reason || err.message || '리라이트 중 오류가 발생했습니다.');
+      setError(err.response?.data?.reason || err.message || t('error.rewriteFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -59,10 +68,19 @@ function App() {
     alert(t('error.saveSuccess'));
   };
 
+  // Upgrade 버튼을 토글로 변경 (DEV 모드에서만 동작)
   const handleUpgrade = () => {
-    // 업그레이드 페이지로 이동 또는 모달 표시
-    alert(t('common.upgrade'));
+    if (IS_DEV) {
+      // DEV 모드: FREE ↔ PRO 토글
+      setPlan(plan === Plan.FREE ? Plan.PRO : Plan.FREE);
+    } else {
+      // 프로덕션: 업그레이드 페이지로 이동 또는 모달 표시
+      alert(t('common.upgrade'));
+    }
   };
+
+  // DEV 모드에서는 항상 PRO로 표시
+  const effectivePlan = IS_DEV ? Plan.PRO : plan;
 
   return (
     <div className="App">
@@ -70,13 +88,18 @@ function App() {
       <header className="App-header">
         <h1>{t('common.appName')}</h1>
         <p className="subtitle">{t('common.subtitle')}</p>
+        {IS_DEV && (
+          <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+            [DEV 모드: 모든 기능 활성화]
+          </p>
+        )}
       </header>
 
       <main className="App-main">
-        <PlanBadge plan={plan} onUpgrade={handleUpgrade} />
+        <PlanBadge plan={effectivePlan} onUpgrade={handleUpgrade} isDev={IS_DEV} />
 
         <RewriteForm
-          plan={plan}
+          plan={effectivePlan}
           onSubmit={handleSubmit}
           isLoading={isLoading}
         />
@@ -94,9 +117,10 @@ function App() {
         {result && !result.safety.blocked && result.variants.length > 0 && (
           <RewriteResultComponent
             variants={result.variants}
-            plan={plan}
+            plan={effectivePlan}
             onCopy={handleCopy}
             onSave={handleSave}
+            isDev={IS_DEV}
           />
         )}
 
@@ -111,4 +135,3 @@ function App() {
 }
 
 export default App;
-
