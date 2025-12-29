@@ -17,6 +17,14 @@ router.post('/', async (req, res) => {
   try {
     const request: RewriteRequest = req.body;
     
+    // text가 비어있으면 400 반환
+    if (!request.text || typeof request.text !== 'string' || !request.text.trim()) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        reason: '문장을 입력해 주세요'
+      });
+    }
+    
     // 기본값 설정
     if (!request.plan) {
       request.plan = 'free';

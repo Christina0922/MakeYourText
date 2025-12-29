@@ -60,6 +60,13 @@ export enum FormatOption {
   EMAIL = 'email'       // 이메일/공문용
 }
 
+// 영어 도우미 모드
+export enum EnglishHelperMode {
+  OFF = 'off',          // 영어 금지
+  PAREN = 'paren',      // 한국어 문장 뒤에 괄호로 영어 1줄 추가
+  TWOLINES = 'twoLines' // 한국어 1줄 + 영어 1줄 병기
+}
+
 // 결과 옵션
 export interface ResultOptions {
   format: 'bullet' | 'paragraph'; // 핵심 bullet / 문단형
@@ -78,6 +85,8 @@ export interface RewriteRequest {
   format: FormatOption;    // 형식 옵션
   strength: Strength;      // 강도 (부드러움 ↔ 단호함)
   resultOptions?: ResultOptions;
+  language?: string;       // 언어 (ko, en, ja)
+  englishHelperMode?: EnglishHelperMode; // 영어 도우미 모드
   plan: Plan;
 }
 

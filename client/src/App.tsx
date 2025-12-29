@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plan, RewriteResult, Strength, LengthOption, FormatOption } from './types';
+import { Plan, RewriteResult, Strength, LengthOption, FormatOption, EnglishHelperMode } from './types';
 import { api } from './services/api';
 import RewriteForm from './components/RewriteForm';
 import RewriteResultComponent from './components/RewriteResult';
@@ -31,6 +31,8 @@ function App() {
     format: FormatOption;
     strength: Strength;
     resultOptions?: any;
+    language?: string;
+    englishHelperMode?: EnglishHelperMode;
   }) => {
     setIsLoading(true);
     setError(null);
@@ -46,7 +48,14 @@ function App() {
       const response = await api.rewrite(rewriteRequest);
       setResult(response);
     } catch (err: any) {
-      setError(err.response?.data?.reason || err.message || t('error.rewriteFailed'));
+      // 400 에러 처리 (text가 비어있는 경우)
+      const errorMessage = err.response?.data?.reason || err.message || t('error.rewriteFailed');
+      setError(errorMessage);
+      
+      // 토스트 메시지 표시 (간단한 alert로 구현)
+      if (err.response?.status === 400) {
+        alert(errorMessage || '문장을 입력해 주세요');
+      }
     } finally {
       setIsLoading(false);
     }

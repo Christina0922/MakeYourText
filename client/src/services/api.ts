@@ -41,8 +41,29 @@ export const api = {
 
   // 리라이트 요청
   rewrite: async (request: RewriteRequest): Promise<RewriteResult> => {
-    const response = await axios.post(`${API_BASE_URL}/rewrite`, request);
-    return response.data;
+    // 요청 직전에 payload를 console.log로 확인
+    console.log('Rewrite API Request Payload:', {
+      text: request.text,
+      tonePresetId: request.tonePresetId,
+      purposeTypeId: request.purposeTypeId,
+      audienceLevelId: request.audienceLevelId,
+      length: request.length,
+      format: request.format,
+      language: request.language,
+      englishHelperMode: request.englishHelperMode,
+      plan: request.plan
+    });
+    
+    try {
+      const response = await axios.post(`${API_BASE_URL}/rewrite`, request);
+      return response.data;
+    } catch (error: any) {
+      // 400 에러 처리 (text가 비어있는 경우)
+      if (error.response?.status === 400) {
+        throw new Error(error.response.data?.reason || '문장을 입력해 주세요');
+      }
+      throw error;
+    }
   },
 
   // TTS 요청 (서버 기반)

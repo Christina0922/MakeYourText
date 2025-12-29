@@ -9,6 +9,7 @@ import {
   LengthOption,
   FormatOption,
   ResultOptions,
+  EnglishHelperMode,
   Plan
 } from '../types';
 import { api } from '../services/api';
@@ -26,6 +27,8 @@ interface RewriteFormProps {
     format: FormatOption;
     strength: Strength;
     resultOptions?: ResultOptions;
+    language?: string;
+    englishHelperMode?: EnglishHelperMode;
   }) => void;
   isLoading: boolean;
 }
@@ -35,7 +38,7 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
   onSubmit,
   isLoading
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [text, setText] = useState('');
   const [tonePresets, setTonePresets] = useState<TonePreset[]>([]);
   const [purposeTypes, setPurposeTypes] = useState<PurposeType[]>([]);
@@ -48,6 +51,7 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
   const [selectedRelationship, setSelectedRelationship] = useState<string>('');
   const [selectedLength, setSelectedLength] = useState<LengthOption>(LengthOption.STANDARD);
   const [selectedFormat, setSelectedFormat] = useState<FormatOption>(FormatOption.MESSAGE);
+  const [englishHelperMode, setEnglishHelperMode] = useState<EnglishHelperMode>(EnglishHelperMode.OFF);
   
   const [strength, setStrength] = useState<Strength>({
     softToFirm: 50
@@ -99,6 +103,11 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
     if (!text.trim() || !selectedTone || !selectedPurpose || !selectedAudience) {
       return;
     }
+    
+    // 현재 언어 가져오기
+    const currentLanguage = i18n.language || 'ko';
+    const languageCode = currentLanguage.split('-')[0]; // 'ko-KR' -> 'ko'
+    
     onSubmit({
       text: text.trim(),
       tonePresetId: selectedTone,
@@ -108,7 +117,9 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
       length: selectedLength,
       format: selectedFormat,
       strength,
-      resultOptions
+      resultOptions,
+      language: languageCode,
+      englishHelperMode
     });
   };
 
@@ -281,6 +292,22 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
           className="form-slider"
         />
       </div>
+
+      {/* 영어 도우미 모드 (한국어 모드일 때만 표시) */}
+      {i18n.language?.startsWith('ko') && (
+        <div className="form-section">
+          <label className="form-label">영어 도우미 모드</label>
+          <select
+            className="form-select"
+            value={englishHelperMode}
+            onChange={(e) => setEnglishHelperMode(e.target.value as EnglishHelperMode)}
+          >
+            <option value={EnglishHelperMode.OFF}>영어 금지 (한국어 100%)</option>
+            <option value={EnglishHelperMode.PAREN}>괄호로 영어 추가</option>
+            <option value={EnglishHelperMode.TWOLINES}>한국어 + 영어 병기</option>
+          </select>
+        </div>
+      )}
 
       {/* 결과 옵션 */}
       <div className="form-section">

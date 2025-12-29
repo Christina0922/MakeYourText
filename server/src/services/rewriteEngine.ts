@@ -1,4 +1,4 @@
-import { RewriteRequest, RewriteResult, RewriteVariant, Strength, LengthOption, FormatOption } from '../types/index.js';
+import { RewriteRequest, RewriteResult, RewriteVariant, Strength, LengthOption, FormatOption, EnglishHelperMode } from '../types/index.js';
 import { TONE_PRESETS, AUDIENCE_LEVELS, PURPOSE_TYPES, RELATIONSHIPS } from '../data/presets.js';
 import { getPlanLimits } from './planLimits.js';
 import { validateTextSafety } from './safety.js';
@@ -61,7 +61,9 @@ export function rewriteText(request: RewriteRequest): RewriteResult {
       request.format,
       request.length,
       type,
-      request.resultOptions
+      request.resultOptions,
+      request.language || 'ko',
+      request.englishHelperMode || EnglishHelperMode.OFF
     );
     variants.push({ type, text: rewritten });
   }
@@ -85,11 +87,18 @@ function applyRewriteRules(
   format: FormatOption,
   requestedLength: LengthOption,
   variantType: 'short' | 'standard' | 'long',
-  resultOptions: any
+  resultOptions: any,
+  language: string,
+  englishHelperMode: EnglishHelperMode
 ): string {
   let result = text;
   
-  // 1. 목적/형식 템플릿 적용
+  // 0. 한국어 모드에서 영어 입력을 한국어로 변환 (템플릿 적용 전에 실행)
+  if (language === 'ko') {
+    result = convertEnglishToKorean(result);
+  }
+  
+  // 1. 목적/형식 템플릿 적용 (원문이 비어있으면 템플릿 접두어/접미어를 붙이지 않음)
   result = applyPurposeTemplate(result, purpose.id, resultOptions?.autoIncludeDetails);
   
   // 2. 톤 적용 (톤별로 명확히 다른 결과)
@@ -106,10 +115,174 @@ function applyRewriteRules(
   // 5. 독자 레벨 적용
   result = applyAudienceLevel(result, audience.id);
   
-  // 6. 길이별 강제 규칙 적용 (마지막에 적용하여 문장 수 제어)
+  // 6. 부드러운 요청형 규칙 적용 (특히 "짧게" 카드) - 마지막에 적용하여 항상 부드럽게
+  result = applySoftRequestRule(result, variantType, strength);
+  
+  // 7. 길이별 강제 규칙 적용 (마지막에 적용하여 문장 수 제어)
   result = applyLengthRule(result, variantType, resultOptions);
   
+  // 8. 언어 정책 강제 후처리 (한국어 모드에서 영어 섞임 방지) - 최종 후처리
+  result = applyLanguagePolicy(result, language, englishHelperMode);
+  
   return result;
+}
+
+/**
+ * 영어 입력을 한국어로 변환 (템플릿 적용 전에 실행)
+ */
+function convertEnglishToKorean(text: string): string {
+  let result = text;
+  
+  // 영어 질문 패턴을 한국어로 변환
+  const englishPatterns: Array<[RegExp, string]> = [
+    [/Why are you smiling\?/gi, '왜 웃고 계신가요'],
+    [/Why are you doing this\?/gi, '왜 이렇게 하시는 건가요'],
+    [/What are you doing these days\?/gi, '요즘 어떻게 지내세요'],
+    [/What are you doing\?/gi, '무엇을 하고 계세요'],
+    [/How are you\?/gi, '어떻게 지내세요'],
+    [/How is it going\?/gi, '어떻게 지내세요'],
+    [/Can you help me\?/gi, '도와주실 수 있을까요'],
+    [/Could you help me\?/gi, '도와주실 수 있을까요'],
+    [/Please help me/gi, '도와주세요'],
+    [/Thank you/gi, '감사합니다'],
+    [/Thanks/gi, '고맙습니다'],
+    [/Why/gi, '왜'],
+    [/What/gi, '무엇을'],
+    [/How/gi, '어떻게'],
+    [/Can you/gi, '할 수 있을까요'],
+    [/Could you/gi, '할 수 있을까요'],
+    [/Please/gi, '부탁드립니다'],
+    [/smiling/gi, '웃고 계신'],
+    [/doing/gi, '하고 계신'],
+    [/this/gi, '이것'],
+    [/that/gi, '그것'],
+  ];
+  
+  // 영어 문장이 대부분이면 한국어로 변환
+  const englishWordCount = (result.match(/\b[A-Za-z]+\b/g) || []).length;
+  const totalWordCount = result.split(/\s+/).filter(w => w.trim().length > 0).length;
+  
+  if (englishWordCount > totalWordCount * 0.5) {
+    // 영어 문장이 대부분이면 패턴 매칭으로 변환
+    for (const [pattern, replacement] of englishPatterns) {
+      result = result.replace(pattern, replacement);
+    }
+    
+    // 남은 영어 단어들을 일반적인 한국어 표현으로 변환
+    result = result.replace(/\b[A-Za-z]+\b/g, (match) => {
+      // 고유명사나 약어는 보존
+      const preserved = ['API', 'URL', 'PDF', 'PPT', 'HTML', 'CSS', 'JS', 'AI', 'IT'];
+      if (preserved.includes(match.toUpperCase())) {
+        return match;
+      }
+      // 일반 영어 단어는 제거 (한국어로 이미 변환되었으므로)
+      return '';
+    }).replace(/\s+/g, ' ').trim();
+  }
+  
+  return result;
+}
+
+/**
+ * 부드러운 요청형 규칙 적용 (특히 "짧게" 카드)
+ */
+function applySoftRequestRule(text: string, variantType: 'short' | 'standard' | 'long', strength: Strength): string {
+  let result = text;
+  
+  // 딱딱한 명령형/요청 표현을 부드러운 완화 표현으로 변경
+  // 단, 이미 부드러운 표현이 있으면 변경하지 않음
+  const softReplacements: Array<[RegExp, string]> = [
+    // 직접적 명령형 → 완화 표현 (이미 완화 표현이 없을 때만)
+    [/해 주세요(?!.*수 있을까요)/g, '해 주실 수 있을까요'],
+    [/해주세요(?!.*수 있을까요)/g, '해 주실 수 있을까요'],
+    [/요청해요(?!.*수 있을까요)/g, '요청해 주실 수 있을까요'],
+    [/요청드립니다(?!.*수 있을까요)/g, '요청해 주실 수 있을까요'],
+    [/부탁해요(?!.*될까요)/g, '부탁드려도 될까요'],
+    [/부탁드립니다(?!.*될까요)/g, '부탁드려도 될까요'],
+    [/해 주시기 바랍니다(?!.*수 있을까요)/g, '해 주실 수 있을까요'],
+    [/해주시기 바랍니다(?!.*수 있을까요)/g, '해 주실 수 있을까요'],
+  ];
+  
+  // "짧게" 카드에서는 더욱 부드럽게
+  if (variantType === 'short') {
+    // 완화 표현 추가 (요청 맥락이 있을 때만)
+    const hasRequestContext = result.includes('부탁') || result.includes('요청') || 
+                              result.includes('해 주') || result.includes('해주') ||
+                              result.includes('주세요') || result.includes('주시');
+    
+    if (hasRequestContext && !result.includes('괜찮으시면') && !result.includes('가능하시면') && !result.includes('편하실 때')) {
+      // 문장 앞부분에 완화 표현 추가
+      if (!result.startsWith('괜찮으시면') && !result.startsWith('가능하시면') && !result.startsWith('편하실 때')) {
+        result = `괜찮으시면 ${result}`;
+      }
+    }
+  }
+  
+  // 모든 카드에 공통 적용 (이미 부드러운 표현이 있으면 스킵)
+  for (const [pattern, replacement] of softReplacements) {
+    if (!result.includes('수 있을까요') && !result.includes('될까요')) {
+      result = result.replace(pattern, replacement);
+    }
+  }
+  
+  // 강도가 낮을 때 (부드러움) 추가 완화 표현
+  if (strength.softToFirm < 50) {
+    // 이미 완화 표현이 있으면 추가하지 않음
+    if (!result.includes('편하실 때') && !result.includes('괜찮으시면')) {
+      result = result
+        .replace(/해 주실 수 있을까요/g, '편하실 때 해 주실 수 있을까요')
+        .replace(/부탁드려도 될까요/g, '괜찮으시면 부탁드려도 될까요');
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * 언어 정책 강제 후처리 (한국어 모드에서 영어 섞임 방지)
+ */
+function applyLanguagePolicy(text: string, language: string, englishHelperMode: EnglishHelperMode): string {
+  // 한국어 모드가 아니면 그대로 반환
+  if (language !== 'ko') {
+    return text;
+  }
+  
+  // 영어 도우미 모드가 OFF면 영어 완전 제거
+  if (englishHelperMode === EnglishHelperMode.OFF) {
+    // 한국어 문장 안에 섞인 영어 단어 제거
+    // 영어 단어 패턴 (단, 고유명사나 약어는 보존)
+    let result = text;
+    
+    // 영어 문장 전체 제거 (한국어와 섞인 경우)
+    result = result.replace(/\b[A-Za-z]+(?:\s+[A-Za-z]+)*\b/g, (match) => {
+      // 고유명사나 약어는 보존 (예: API, URL, PDF 등)
+      const preserved = ['API', 'URL', 'PDF', 'PPT', 'PDF', 'HTML', 'CSS', 'JS', 'AI', 'IT'];
+      if (preserved.includes(match.toUpperCase())) {
+        return match;
+      }
+      // 한국어 문장 중간에 있는 영어는 제거
+      return '';
+    }).replace(/\s+/g, ' ').trim();
+    
+    // 영어 질문 패턴 제거 (예: "What are you doing these days?")
+    result = result.replace(/[A-Z][a-z]+(?:\s+[a-z]+)*\?/g, '');
+    
+    return result;
+  }
+  
+  // PAREN 모드: 한국어 문장 뒤에 괄호로 영어 추가
+  if (englishHelperMode === EnglishHelperMode.PAREN) {
+    // 현재는 한국어만 반환 (영어 번역은 별도 로직 필요)
+    return text;
+  }
+  
+  // TWOLINES 모드: 한국어 1줄 + 영어 1줄 병기
+  if (englishHelperMode === EnglishHelperMode.TWOLINES) {
+    // 현재는 한국어만 반환 (영어 번역은 별도 로직 필요)
+    return text;
+  }
+  
+  return text;
 }
 
 /**
@@ -136,9 +309,15 @@ function applyFormatOption(text: string, format: FormatOption): string {
 }
 
 /**
- * 목적/형식 템플릿 적용
+ * 목적/형식 템플릿 적용 (원문이 비어있으면 템플릿 접두어/접미어를 붙이지 않음)
  */
 function applyPurposeTemplate(text: string, purposeId: string, autoIncludeDetails?: boolean): string {
+  // 원문이 비어있거나 의미가 없으면 템플릿을 적용하지 않음
+  const trimmedText = text.trim();
+  if (!trimmedText || trimmedText.length === 0 || trimmedText === '?' || trimmedText === '.') {
+    return text; // 원문 그대로 반환 (템플릿 접두어/접미어 없음)
+  }
+  
   // 이미 해당 형식이 포함되어 있으면 스킵
   if (text.includes('[공지]') || text.includes('공지')) return text;
   
@@ -146,23 +325,43 @@ function applyPurposeTemplate(text: string, purposeId: string, autoIncludeDetail
     request: (t) => {
       if (t.includes('부탁') || t.includes('요청')) return t;
       if (t.endsWith('주세요') || t.endsWith('주시기 바랍니다')) return t;
-      return `${t} 부탁드립니다.`;
+      // 원문이 비어있지 않으면 부탁 표현 추가
+      if (t.trim().length > 0) {
+        return `${t} 부탁드립니다.`;
+      }
+      return t;
     },
-    notice: (t) => {
+    'notice-guide': (t) => {
       if (t.includes('[공지]')) return t;
-      return `[공지] ${t}`;
+      // 원문이 비어있지 않으면 공지 접두어 추가
+      if (t.trim().length > 0) {
+        return `[공지] ${t}`;
+      }
+      return t;
     },
     apology: (t) => {
       if (t.includes('죄송') || t.includes('사과')) return t;
-      return `죄송합니다. ${t}`;
+      // 원문이 비어있지 않으면 사과 표현 추가
+      if (t.trim().length > 0) {
+        return `죄송합니다. ${t}`;
+      }
+      return t;
     },
-    review: (t) => {
+    'review-thanks': (t) => {
       if (t.includes('후기') || t.includes('감사')) return t;
-      return `${t}에 대한 후기입니다.`;
+      // 원문이 비어있지 않으면 후기 표현 추가
+      if (t.trim().length > 0) {
+        return `${t}에 대한 후기입니다.`;
+      }
+      return t;
     },
-    complaint: (t) => {
+    'complaint-correction': (t) => {
       if (t.includes('항의') || t.includes('불만')) return t;
-      return `${t}에 대해 항의드립니다.`;
+      // 원문이 비어있지 않으면 항의 표현 추가
+      if (t.trim().length > 0) {
+        return `${t}에 대해 항의드립니다.`;
+      }
+      return t;
     }
   };
   
@@ -487,4 +686,3 @@ function applyLengthRule(
       return text;
   }
 }
-
