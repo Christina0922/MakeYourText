@@ -67,11 +67,40 @@ export enum EnglishHelperMode {
   TWOLINES = 'twoLines' // 한국어 1줄 + 영어 1줄 병기
 }
 
+// 보이스 프리셋
+export interface VoicePreset {
+  id: string;
+  label: string;
+  gender: string;
+  age: string;
+  style: string;
+}
+
+// 음성 컨트롤
+export interface VoiceControls {
+  rate: number;
+  pitch: number;
+  emotion: number;
+}
+
 // 결과 옵션
 export interface ResultOptions {
   format: 'bullet' | 'paragraph'; // 핵심 bullet / 문단형
   ambiguityWarning: boolean; // 오해 가능 표현 경고
   autoIncludeDetails: boolean; // 기한/요청사항/근거/다음 단계 자동 포함
+}
+
+// 템플릿 정의 (상황/연령/채널/관계 조합)
+export interface Template {
+  id: string;
+  name: string;
+  purposeId: string;      // 상황: 요청/안내공지/사과/후기감사/항의시정요구
+  audienceId: string;     // 연령: 어린이/청소년/성인/시니어
+  format: FormatOption;   // 채널: 문자/이메일
+  relationshipId?: string; // 관계 (선택)
+  toneId: string;         // 톤
+  tags: string[];         // 태그 (연령·채널·관계)
+  group: string;          // 그룹 (상황)
 }
 
 // 리라이트 요청
@@ -88,6 +117,7 @@ export interface RewriteRequest {
   language?: string;       // 언어 (ko, en, ja)
   englishHelperMode?: EnglishHelperMode; // 영어 도우미 모드
   plan: Plan;
+  selectedTemplates?: string[]; // ✅ 템플릿 ID 배열 (일괄 생성용)
 }
 
 // 리라이트 결과 변형
@@ -96,17 +126,23 @@ export interface RewriteVariant {
   text: string;
 }
 
-// 안전 검사 결과
-export interface SafetyCheck {
-  blocked: boolean;
-  reason?: string;
-  suggestedAlternative?: string;
+// 템플릿별 결과
+export interface TemplateResult {
+  templateId: string;
+  templateName: string;
+  tags: string[];
+  text: string;
+  error?: string;
 }
 
 // 리라이트 결과
 export interface RewriteResult {
   variants: RewriteVariant[];
-  safety: SafetyCheck;
+  safety: {
+    blocked: boolean;
+    reason?: string;
+  };
+  templateResults?: TemplateResult[]; // ✅ 템플릿별 결과 (일괄 생성용)
 }
 
 // 사용량 제한
@@ -117,4 +153,10 @@ export interface UsageLimits {
   maxVoices: number;
   voicePlayLimit: number;
   historyLimit: number;
+}
+
+// 안전 검사 결과
+export interface SafetyCheck {
+  blocked: boolean;
+  reason?: string;
 }

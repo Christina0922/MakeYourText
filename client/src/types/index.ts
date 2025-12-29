@@ -111,8 +111,48 @@ export interface SafetyCheck {
   suggestedAlternative?: string;
 }
 
+// 템플릿 정의
+export interface Template {
+  id: string;
+  name: string;
+  purposeId: string;
+  audienceId: string;
+  format: FormatOption;
+  relationshipId?: string;
+  toneId: string;
+  tags: string[];
+  group: string;
+}
+
+// 템플릿별 결과
+export interface TemplateResult {
+  templateId: string;
+  templateName: string;
+  tags: string[];
+  text: string;
+  error?: string;
+}
+
+// 리라이트 요청
+export interface RewriteRequest {
+  text: string;
+  tonePresetId: string;
+  purposeTypeId: string;
+  audienceLevelId: string;
+  relationshipId?: string;
+  length: LengthOption;
+  format: FormatOption;
+  strength: Strength;
+  resultOptions?: ResultOptions;
+  language?: string;
+  englishHelperMode?: EnglishHelperMode;
+  plan: Plan;
+  selectedTemplates?: string[]; // ✅ 템플릿 ID 배열 (일괄 생성용)
+}
+
 // 리라이트 결과
 export interface RewriteResult {
   variants: RewriteVariant[];
   safety: SafetyCheck;
+  templateResults?: TemplateResult[]; // ✅ 템플릿별 결과 (일괄 생성용)
 }

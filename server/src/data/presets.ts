@@ -83,10 +83,10 @@ export const RELATIONSHIPS: Relationship[] = [
 // 목적 버튼 5개
 export const PURPOSE_TYPES: PurposeType[] = [
   { id: 'request', label: '요청' },
-  { id: 'notice', label: '안내/공지' },
+  { id: 'notice-guide', label: '안내/공지' },
   { id: 'apology', label: '사과' },
-  { id: 'review', label: '후기/감사' },
-  { id: 'complaint', label: '항의/시정요구' }
+  { id: 'review-thanks', label: '후기/감사' },
+  { id: 'complaint-correction', label: '항의/시정요구' }
 ];
 
 // 보이스 프리셋

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plan, RewriteResult, Strength, LengthOption, FormatOption, EnglishHelperMode } from './types';
+import { Plan, RewriteResult, Strength, LengthOption, FormatOption, EnglishHelperMode, TemplateResult } from './types';
 import { api } from './services/api';
 import RewriteForm from './components/RewriteForm';
 import RewriteResultComponent from './components/RewriteResult';
+import TemplateSelector from './components/TemplateSelector';
+import TemplateResults from './components/TemplateResults';
 import SafetyWarning from './components/SafetyWarning';
 import PlanBadge from './components/PlanBadge';
 import LanguageSelector from './components/LanguageSelector';
@@ -20,6 +22,11 @@ function App() {
   const [result, setResult] = useState<RewriteResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [englishHelperMode, setEnglishHelperMode] = useState<EnglishHelperMode>(EnglishHelperMode.OFF);
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [templateResults, setTemplateResults] = useState<TemplateResult[]>([]);
+  const [isGeneratingTemplates, setIsGeneratingTemplates] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
 
   const handleSubmit = async (request: {
     text: string;
@@ -34,16 +41,70 @@ function App() {
     language?: string;
     englishHelperMode?: EnglishHelperMode;
   }) => {
+    // ✅ 템플릿 일괄 생성 모드
+    if (selectedTemplates.length > 0) {
+      setIsGeneratingTemplates(true);
+      setError(null);
+      setTemplateResults([]);
+      setGenerationProgress(0);
+      
+      // englishHelperMode를 request에서 받아서 state에 저장 (최신 값 보장)
+      if (request.englishHelperMode !== undefined) {
+        setEnglishHelperMode(request.englishHelperMode);
+      }
+
+      try {
+        // DEV 모드에서는 항상 PRO로 요청
+        const effectivePlan = IS_DEV ? Plan.PRO : plan;
+        const rewriteRequest = {
+          ...request,
+          plan: effectivePlan,
+          englishHelperMode: request.englishHelperMode || EnglishHelperMode.OFF,
+          selectedTemplates // ✅ 템플릿 ID 배열 포함
+        };
+        
+        // 진행률 업데이트를 위한 시뮬레이션
+        const progressInterval = setInterval(() => {
+          setGenerationProgress(prev => Math.min(prev + 2, 90));
+        }, 100);
+        
+        const response = await api.rewrite(rewriteRequest);
+        
+        clearInterval(progressInterval);
+        setGenerationProgress(100);
+        
+        if (response.templateResults) {
+          setTemplateResults(response.templateResults);
+        }
+      } catch (err: any) {
+        const errorMessage = err.response?.data?.reason || err.message || t('error.rewriteFailed');
+        setError(errorMessage);
+        alert(errorMessage || '템플릿 생성에 실패했습니다');
+      } finally {
+        setIsGeneratingTemplates(false);
+        setGenerationProgress(0);
+      }
+      return;
+    }
+    
+    // 기존 단일 생성 모드
     setIsLoading(true);
     setError(null);
     setResult(null);
+    
+    // englishHelperMode를 request에서 받아서 state에 저장 (최신 값 보장)
+    if (request.englishHelperMode !== undefined) {
+      setEnglishHelperMode(request.englishHelperMode);
+    }
 
     try {
       // DEV 모드에서는 항상 PRO로 요청
       const effectivePlan = IS_DEV ? Plan.PRO : plan;
       const rewriteRequest = {
         ...request,
-        plan: effectivePlan
+        plan: effectivePlan,
+        // ✅ englishHelperMode를 payload에 반드시 포함
+        englishHelperMode: request.englishHelperMode || EnglishHelperMode.OFF
       };
       const response = await api.rewrite(rewriteRequest);
       setResult(response);
@@ -59,6 +120,11 @@ function App() {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const handleTemplateRetry = async (templateId: string) => {
+    // 재시도 로직 (필요시 구현)
+    console.log('Retry template:', templateId);
   };
 
   const handleCopy = (text: string) => {
@@ -88,6 +154,19 @@ function App() {
     }
   };
 
+  // 초기화면으로 이동 (결과 초기화)
+  const handleReset = () => {
+    setResult(null);
+    setTemplateResults([]);
+    setSelectedTemplates([]);
+    setError(null);
+    setIsLoading(false);
+    setIsGeneratingTemplates(false);
+    setGenerationProgress(0);
+    // 스크롤을 맨 위로 이동
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // DEV 모드에서는 항상 PRO로 표시
   const effectivePlan = IS_DEV ? Plan.PRO : plan;
 
@@ -95,8 +174,12 @@ function App() {
     <div className="App">
       <LanguageSelector />
       <header className="App-header">
-        <h1>{t('common.appName')}</h1>
-        <p className="subtitle">{t('common.subtitle')}</p>
+        <h1 className="app-title" onClick={handleReset} style={{ cursor: 'pointer' }}>
+          {t('common.appName')}
+        </h1>
+        <p className="subtitle" onClick={handleReset} style={{ cursor: 'pointer' }}>
+          {t('common.subtitle')}
+        </p>
         {IS_DEV && (
           <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
             [DEV 모드: 모든 기능 활성화]
@@ -130,6 +213,7 @@ function App() {
             onCopy={handleCopy}
             onSave={handleSave}
             isDev={IS_DEV}
+            englishHelperMode={englishHelperMode}
           />
         )}
 

@@ -4,6 +4,33 @@ import { VOICE_PRESETS } from '../data/presets.js';
 const router = express.Router();
 
 /**
+ * 텍스트를 낭독용으로 전처리 (SSML break 태그 추가)
+ */
+function preprocessTextForSSML(text: string): string {
+  let result = text;
+  
+  // 1. 문장부호 기반 쉼 추가
+  // 쉼표 뒤에 150ms 쉼
+  result = result.replace(/,/g, '<break time="150ms"/>');
+  // 마침표 뒤에 300ms 쉼
+  result = result.replace(/\./g, '<break time="300ms"/>');
+  // 물음표/느낌표 뒤에 350ms 쉼
+  result = result.replace(/\?/g, '<break time="350ms"/>');
+  result = result.replace(/!/g, '<break time="350ms"/>');
+  
+  // 2. 강조어(요청/기한/중요)에 emphasis 추가
+  const emphasisWords = ['부탁', '요청', '기한', '오늘', '내일', '반드시', '중요', '필수'];
+  for (const word of emphasisWords) {
+    if (result.includes(word)) {
+      // SSML emphasis 태그로 강조
+      result = result.replace(new RegExp(`(${word})`, 'g'), '<emphasis level="moderate">$1</emphasis>');
+    }
+  }
+  
+  return result;
+}
+
+/**
  * POST /api/tts
  * 텍스트를 음성으로 변환 (서버 기반 TTS)
  * SSML을 사용하여 속도/높낮이/강도를 반영
@@ -26,21 +53,37 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // 텍스트 전처리 (낭독용으로 변환)
+    const processedText = preprocessTextForSSML(text);
+
     // SSML 생성 (속도/높낮이/강도 반영)
     // rate: 0.8 ~ 1.2 (기본 1.0)
-    // pitch: 0 ~ 100 (50이 기본, 0.5 ~ 1.5로 변환)
+    // pitch: 0 ~ 100 (50이 기본, -10% ~ +10%로 변환)
     // emotion: 0 ~ 100 (50이 기본, 볼륨/강조로 반영)
     
-    const ssmlRate = rate || 1.0;
-    const ssmlPitch = 0.5 + ((pitch || 50) / 100); // 0.5 ~ 1.5
-    const ssmlVolume = 0.5 + ((emotion || 50) / 200); // 0.5 ~ 1.0
+    const ssmlRate = Math.max(0.8, Math.min(1.2, rate || 1.0));
+    // pitch: 0-100을 -10% ~ +10%로 변환 (SSML pitch는 percentage)
+    const pitchValue = pitch || 50;
+    const ssmlPitch = ((pitchValue - 50) / 50) * 10; // -10% ~ +10%
+    
+    // emotion: 0-100을 볼륨과 속도 변화로 반영
+    const emotionValue = emotion || 50;
+    const ssmlVolume = 0.7 + (emotionValue / 333); // 0.7 ~ 1.0
+    
+    // 감정 강도에 따라 속도도 약간 조절
+    let adjustedRate = ssmlRate;
+    if (emotionValue > 70) {
+      adjustedRate = Math.min(1.2, ssmlRate + 0.1);
+    } else if (emotionValue < 30) {
+      adjustedRate = Math.max(0.8, ssmlRate - 0.1);
+    }
 
     // SSML 형식으로 텍스트 래핑
     const ssml = `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}">
         <voice name="${getVoiceName(preset)}">
-          <prosody rate="${ssmlRate}" pitch="${ssmlPitch}" volume="${ssmlVolume}">
-            ${escapeXml(text)}
+          <prosody rate="${adjustedRate}" pitch="${ssmlPitch > 0 ? '+' : ''}${ssmlPitch.toFixed(1)}%" volume="${ssmlVolume.toFixed(2)}">
+            ${processedText}
           </prosody>
         </voice>
       </speak>
@@ -102,4 +145,3 @@ function escapeXml(text: string): string {
 }
 
 export default router;
-
