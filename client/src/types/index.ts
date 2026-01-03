@@ -96,6 +96,7 @@ export interface RewriteRequest {
   language?: string;       // 언어 (ko, en, ja)
   englishHelperMode?: EnglishHelperMode; // 영어 도우미 모드
   plan: Plan;
+  selectedTemplates?: string[]; // 템플릿 ID 배열 (일괄 생성용)
 }
 
 // 리라이트 결과 변형
@@ -133,26 +134,28 @@ export interface TemplateResult {
   error?: string;
 }
 
-// 리라이트 요청
-export interface RewriteRequest {
-  text: string;
-  tonePresetId: string;
-  purposeTypeId: string;
-  audienceLevelId: string;
-  relationshipId?: string;
-  length: LengthOption;
-  format: FormatOption;
-  strength: Strength;
-  resultOptions?: ResultOptions;
-  language?: string;
-  englishHelperMode?: EnglishHelperMode;
-  plan: Plan;
-  selectedTemplates?: string[]; // ✅ 템플릿 ID 배열 (일괄 생성용)
-}
-
 // 리라이트 결과
 export interface RewriteResult {
   variants: RewriteVariant[];
   safety: SafetyCheck;
-  templateResults?: TemplateResult[]; // ✅ 템플릿별 결과 (일괄 생성용)
+  templateResults?: TemplateResult[]; // 템플릿별 결과 (일괄 생성용)
+}
+
+// 미리듣기 한도 정보
+export interface PreviewQuota {
+  remainingCount: number; // -1이면 무제한
+  limitCount: number; // -1이면 무제한
+  resetAt: string; // ISO 8601 형식
+  unlimited: boolean;
+}
+
+// 미리듣기 에러 응답
+export interface PreviewQuotaError {
+  error: string;
+  errorCode: 'QUOTA_EXCEEDED' | 'LENGTH_EXCEEDED' | 'INVALID_REQUEST' | 'INTERNAL_ERROR';
+  message?: string;
+  upgradeRequired: boolean;
+  remainingCount?: number;
+  limitCount?: number;
+  resetAt?: string;
 }

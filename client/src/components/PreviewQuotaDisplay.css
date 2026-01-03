@@ -1,0 +1,45 @@
+.preview-quota-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: #f0f7ff;
+  border: 1px solid #b3d9ff;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #0066cc;
+}
+
+.preview-quota-display.unlimited {
+  background-color: #e8f5e9;
+  border-color: #81c784;
+  color: #2e7d32;
+}
+
+.preview-quota-display.low {
+  background-color: #fff3e0;
+  border-color: #ffb74d;
+  color: #e65100;
+}
+
+.preview-quota-display.exhausted {
+  background-color: #ffebee;
+  border-color: #ef5350;
+  color: #c62828;
+}
+
+.preview-quota-display .quota-label {
+  font-weight: 500;
+}
+
+.preview-quota-display .quota-count {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.preview-quota-display .quota-reset {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+

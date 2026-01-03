@@ -1,5 +1,5 @@
 import express from 'express';
-import { rewriteText, rewriteTextForTemplate } from '../services/rewriteEngine.js';
+import { rewriteText, rewriteTextForTemplate, RewriteRequest as EngineRewriteRequest, RewriteResult } from '../services/rewriteEngine.js';
 import { checkUsageLimit } from '../services/planLimits.js';
 import { RewriteRequest, EnglishHelperMode, TemplateResult } from '../types/index.js';
 import { TEMPLATES } from '../data/templates.js';
@@ -118,13 +118,20 @@ router.post('/', async (req, res) => {
           };
           
           // 템플릿별 리라이트 실행
-          const templateText = await rewriteTextForTemplate(templateRequest);
+          const templateResult = rewriteTextForTemplate({
+            text: templateRequest.text,
+            tonePresetId: templateRequest.tonePresetId,
+            strength: typeof templateRequest.strength === 'object' ? templateRequest.strength.softToFirm / 100 : (templateRequest.strength || 0.6),
+            variantType: 'KOREAN',
+            purposeId: templateRequest.purposeTypeId,
+            templateId: templateId
+          });
           
           templateResults.push({
             templateId,
             templateName: template.name,
             tags: template.tags,
-            text: templateText
+            text: templateResult.text
           });
         } catch (error: any) {
           templateResults.push({
@@ -161,12 +168,23 @@ router.post('/', async (req, res) => {
       plan: plan || 'free'
     };
 
-    // 리라이트 실행
-    const result = rewriteText(rewriteRequest);
+    // 리라이트 실행 (새로운 rewriteEngine 사용)
+    const engineRequest: EngineRewriteRequest = {
+      text: rewriteRequest.text,
+      tonePresetId: rewriteRequest.tonePresetId,
+      strength: typeof rewriteRequest.strength === 'object' ? rewriteRequest.strength.softToFirm / 100 : (typeof rewriteRequest.strength === 'number' ? rewriteRequest.strength : 0.6),
+      variantType: 'KOREAN',
+      purposeId: rewriteRequest.purposeTypeId,
+    };
+    
+    const engineResult = rewriteText(engineRequest);
 
-    // ✅ 응답에 englishHelperMode 포함 (DEV 모드 확인용)
+    // 기존 응답 형식 유지
     res.json({
-      ...result,
+      variants: [
+        { type: 'standard', text: engineResult.text }
+      ],
+      safety: { blocked: false },
       meta: {
         englishHelperMode: englishHelperMode
       }

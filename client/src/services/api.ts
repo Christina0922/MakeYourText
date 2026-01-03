@@ -7,7 +7,9 @@ import {
   Relationship,
   RewriteRequest,
   RewriteResult,
-  Template
+  Template,
+  Plan,
+  PreviewQuota,
 } from '../types';
 
 // 환경변수로 서버 주소 읽기 (REACT_APP_API_BASE_URL 사용)
@@ -173,5 +175,18 @@ export const api = {
       console.error('generateTts error:', error);
       throw error;
     }
-  }
+  },
+
+  // 미리듣기 한도 조회
+  getPreviewQuota: async (plan: Plan): Promise<PreviewQuota> => {
+    try {
+      const response = await axiosInstance.get('/tts/preview/quota', {
+        params: { plan },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('getPreviewQuota error:', error);
+      throw error;
+    }
+  },
 };

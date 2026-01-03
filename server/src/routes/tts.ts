@@ -1,5 +1,12 @@
 import express from 'express';
 import { VOICE_PRESETS } from '../data/presets.js';
+import { Plan } from '../types/index.js';
+import {
+  checkPreviewQuota,
+  incrementPreviewUsage,
+  getPreviewUsage,
+  UserIdentifier,
+} from '../services/previewQuota.js';
 
 const router = express.Router();
 
@@ -143,5 +150,170 @@ function escapeXml(text: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 }
+
+/**
+ * 사용자 식별자 추출 (헤더에서)
+ * - Authorization 헤더가 있으면 로그인 사용자 (userId)
+ * - 없으면 X-Anonymous-Token 헤더에서 익명 토큰 사용
+ * - 둘 다 없으면 IP 기반 임시 식별자 생성
+ */
+function getUserIdentifier(req: express.Request): UserIdentifier {
+  // 로그인 사용자 확인 (실제로는 JWT 토큰 검증)
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    // TODO: JWT 토큰에서 userId 추출
+    // 임시로 토큰 자체를 사용
+    const token = authHeader.substring(7);
+    return { type: 'logged_in', id: token };
+  }
+  
+  // 익명 사용자 토큰 확인
+  const anonymousToken = req.headers['x-anonymous-token'] as string;
+  if (anonymousToken) {
+    return { type: 'anonymous', id: anonymousToken };
+  }
+  
+  // 둘 다 없으면 IP 기반 임시 식별자 (개발용)
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  return { type: 'anonymous', id: `ip:${ip}` };
+}
+
+/**
+ * POST /api/tts/preview
+ * 미리듣기 전용 API (한도 검사 포함)
+ */
+router.post('/preview', async (req, res) => {
+  try {
+    const {
+      text,
+      voicePreset,
+      rate,
+      pitch,
+      emotion,
+      language = 'ko-KR',
+      plan = Plan.FREE, // 클라이언트에서 전달
+    } = req.body;
+
+    if (!text || !voicePreset) {
+      return res.status(400).json({
+        error: 'Missing required parameters: text, voicePreset',
+        errorCode: 'INVALID_REQUEST',
+      });
+    }
+
+    // 사용자 식별자 추출
+    const identifier = getUserIdentifier(req);
+    
+    // 한도 검사
+    const quotaCheck = checkPreviewQuota(identifier, plan, text);
+    
+    if (!quotaCheck.allowed) {
+      return res.status(403).json({
+        error: quotaCheck.message || '미리듣기 한도를 초과했습니다.',
+        errorCode: quotaCheck.errorCode,
+        upgradeRequired: quotaCheck.upgradeRequired,
+        remainingCount: quotaCheck.remainingCount,
+        limitCount: quotaCheck.limitCount,
+        resetAt: quotaCheck.resetAt,
+      });
+    }
+
+    // 보이스 프리셋 확인
+    const preset = VOICE_PRESETS.find(v => v.id === voicePreset);
+    if (!preset) {
+      return res.status(400).json({
+        error: 'Invalid voice preset',
+        errorCode: 'INVALID_REQUEST',
+      });
+    }
+
+    // 텍스트 전처리 (낭독용으로 변환)
+    const processedText = preprocessTextForSSML(text);
+
+    // SSML 생성
+    const ssmlRate = Math.max(0.8, Math.min(1.2, rate || 1.0));
+    const pitchValue = pitch || 50;
+    const ssmlPitch = ((pitchValue - 50) / 50) * 10;
+    const emotionValue = emotion || 50;
+    const ssmlVolume = 0.7 + (emotionValue / 333);
+    
+    let adjustedRate = ssmlRate;
+    if (emotionValue > 70) {
+      adjustedRate = Math.min(1.2, ssmlRate + 0.1);
+    } else if (emotionValue < 30) {
+      adjustedRate = Math.max(0.8, ssmlRate - 0.1);
+    }
+
+    const ssml = `
+      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}">
+        <voice name="${getVoiceName(preset)}">
+          <prosody rate="${adjustedRate}" pitch="${ssmlPitch > 0 ? '+' : ''}${ssmlPitch.toFixed(1)}%" volume="${ssmlVolume.toFixed(2)}">
+            ${processedText}
+          </prosody>
+        </voice>
+      </speak>
+    `.trim();
+
+    // 실제 TTS 서비스 호출 (예: Google Cloud TTS, Azure TTS, AWS Polly 등)
+    // TODO: 실제 TTS 서비스 연동
+    // 예: const audioBuffer = await ttsService.synthesize(ssml);
+    
+    // 사용량 증가 (성공 시에만)
+    incrementPreviewUsage(identifier);
+    
+    // 현재 사용량 조회
+    const usage = getPreviewUsage(identifier, plan);
+    
+    // 임시로 에러 반환 (실제 TTS 서비스 연동 필요)
+    // 실제 구현 시에는 audio/mpeg로 응답
+    res.status(501).json({
+      error: 'Server TTS not implemented yet',
+      message: 'Please use browser TTS for now. Set REACT_APP_USE_SERVER_TTS=false',
+      ssml: ssml, // 디버깅용
+      quota: {
+        remainingCount: usage.remainingCount,
+        limitCount: usage.limitCount,
+        resetAt: usage.resetAt,
+      },
+    });
+
+    // 실제 구현 시:
+    // res.setHeader('Content-Type', 'audio/mpeg');
+    // res.send(audioBuffer);
+  } catch (error: any) {
+    console.error('Preview TTS error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      errorCode: 'INTERNAL_ERROR',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/tts/preview/quota
+ * 현재 사용자의 미리듣기 한도 정보 조회
+ */
+router.get('/preview/quota', async (req, res) => {
+  try {
+    const plan = (req.query.plan as Plan) || Plan.FREE;
+    const identifier = getUserIdentifier(req);
+    const usage = getPreviewUsage(identifier, plan);
+    
+    res.json({
+      remainingCount: usage.remainingCount === Infinity ? -1 : usage.remainingCount,
+      limitCount: usage.limitCount === Infinity ? -1 : usage.limitCount,
+      resetAt: usage.resetAt,
+      unlimited: usage.limitCount === Infinity,
+    });
+  } catch (error: any) {
+    console.error('Quota check error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      errorCode: 'INTERNAL_ERROR',
+      message: error.message,
+    });
+  }
+});
 
 export default router;

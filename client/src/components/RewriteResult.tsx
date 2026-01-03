@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RewriteVariant, VoicePreset, VoiceControls, Plan, EnglishHelperMode } from '../types';
+import { RewriteVariant, VoicePreset, VoiceControls, Plan, EnglishHelperMode, PreviewQuota } from '../types';
 import { api } from '../services/api';
 import { ttsProvider } from '../services/tts';
+import { requestPreview, getPreviewQuota, trackPreviewEvent } from '../services/previewService';
+import PreviewQuotaDisplay from './PreviewQuotaDisplay';
+import UpgradeModal from './UpgradeModal';
 import './RewriteResult.css';
 
 interface RewriteResultProps {
@@ -37,6 +40,11 @@ const RewriteResultComponent: React.FC<RewriteResultProps> = ({
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<Record<string, string | null>>({});
   const [hasChanges, setHasChanges] = useState<Record<string, boolean>>({});
+  
+  // 미리듣기 한도 관련 state
+  const [quota, setQuota] = useState<PreviewQuota | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalMessage, setUpgradeModalMessage] = useState<string>('');
 
   useEffect(() => {
     api.getVoicePresets().then(presets => {
@@ -65,7 +73,20 @@ const RewriteResultComponent: React.FC<RewriteResultProps> = ({
         setVoiceControls(prev => ({ ...prev, ...initialControls }));
       }
     });
-  }, [variants]);
+    
+    // 미리듣기 한도 조회
+    loadQuota();
+  }, [variants, plan]);
+  
+  // 한도 정보 로드
+  const loadQuota = async () => {
+    try {
+      const quotaData = await getPreviewQuota(plan);
+      setQuota(quotaData);
+    } catch (error) {
+      console.error('Failed to load quota:', error);
+    }
+  };
 
   // 설정 변경 감지
   const handleVoiceChange = (variantType: string, voiceId: string) => {
@@ -139,17 +160,78 @@ const RewriteResultComponent: React.FC<RewriteResultProps> = ({
       return;
     }
 
+    // 미리듣기 이벤트 기록
+    trackPreviewEvent('preview_clicked', { plan, variantType: variant.type });
+
     setPlaying(prev => ({ ...prev, [variant.type]: true }));
     setLoading(prev => ({ ...prev, [variant.type]: true }));
     setError(prev => ({ ...prev, [variant.type]: null }));
 
     try {
-      // 슬라이더 값이 반영된 TTS 재생 (englishHelperMode 전달)
+      // 서버에서 한도 검사 후 미리듣기 요청
+      const previewResult = await requestPreview(
+        variant.text,
+        voice,
+        controls,
+        plan,
+        'ko-KR'
+      );
+
+      if (!previewResult.success) {
+        // 한도 초과 또는 기타 에러
+        if (previewResult.error?.upgradeRequired) {
+          setUpgradeModalMessage(
+            previewResult.error.message || '무료 미리듣기 한도를 사용하셨습니다. 계속 사용하려면 요금제를 선택해 주세요.'
+          );
+          setShowUpgradeModal(true);
+          trackPreviewEvent('preview_failed', {
+            plan,
+            errorCode: previewResult.error.errorCode,
+            variantType: variant.type,
+          });
+        } else {
+          setError(prev => ({
+            ...prev,
+            [variant.type]: previewResult.error?.message || '미리듣기에 실패했습니다.',
+          }));
+        }
+        
+        // 한도 정보 업데이트
+        if (previewResult.error?.remainingCount !== undefined) {
+          setQuota(prev => prev ? {
+            ...prev,
+            remainingCount: previewResult.error!.remainingCount!,
+            limitCount: previewResult.error!.limitCount || prev.limitCount,
+            resetAt: previewResult.error!.resetAt || prev.resetAt,
+          } : null);
+        }
+        
+        return;
+      }
+
+      // 한도 검사 통과 - 실제 TTS 재생
       await ttsProvider.speak(variant.text, voice, controls, englishHelperMode);
+      
+      // 성공 이벤트 기록
+      trackPreviewEvent('preview_success', { plan, variantType: variant.type });
+      
+      // 한도 정보 업데이트
+      if (previewResult.quota) {
+        setQuota(previewResult.quota);
+      } else {
+        // 한도 정보 다시 조회
+        await loadQuota();
+      }
     } catch (error: any) {
       console.error('TTS error:', error);
       const errorMessage = error?.message || '음성 생성에 실패했습니다. 다시 시도해 주세요.';
       setError(prev => ({ ...prev, [variant.type]: errorMessage }));
+      trackPreviewEvent('preview_failed', {
+        plan,
+        errorCode: 'INTERNAL_ERROR',
+        variantType: variant.type,
+        error: errorMessage,
+      });
     } finally {
       setPlaying(prev => ({ ...prev, [variant.type]: false }));
       setLoading(prev => ({ ...prev, [variant.type]: false }));
@@ -200,9 +282,29 @@ const RewriteResultComponent: React.FC<RewriteResultProps> = ({
   // DEV 모드에서는 모든 기능 활성화
   const canUseAdvancedFeatures = isDev || plan !== 'free';
 
+  const handleUpgrade = () => {
+    // 실제로는 결제 페이지로 이동하거나 업그레이드 처리
+    console.log('Upgrade requested');
+    // TODO: 결제 페이지로 이동
+    window.alert('업그레이드 기능은 준비 중입니다.');
+  };
+
   return (
     <div className="rewrite-results">
-      <h3 className="results-title">{t('result.title')}</h3>
+      <div className="results-header">
+        <h3 className="results-title">{t('result.title')}</h3>
+        {quota && (
+          <PreviewQuotaDisplay quota={quota} plan={plan} />
+        )}
+      </div>
+      
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgrade={handleUpgrade}
+        message={upgradeModalMessage}
+        plan={plan}
+      />
       
       {variants.map((variant) => {
         const isPlaying = playing[variant.type] || false;
