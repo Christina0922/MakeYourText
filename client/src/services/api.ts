@@ -15,6 +15,27 @@ import {
 // 환경변수로 서버 주소 읽기 (REACT_APP_API_BASE_URL 사용)
 const API_BASE_URL = (typeof process !== 'undefined' && process.env?.REACT_APP_API_BASE_URL) || 'http://localhost:5000/api';
 
+/**
+ * 익명 userId 생성 및 저장
+ */
+function getOrCreateUserId(): string {
+  const STORAGE_KEY = 'makeyourtext_user_id';
+  let userId = localStorage.getItem(STORAGE_KEY);
+  
+  if (!userId) {
+    // UUID v4 형식의 ID 생성
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      userId = crypto.randomUUID();
+    } else {
+      // Fallback: 간단한 ID 생성
+      userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+    }
+    localStorage.setItem(STORAGE_KEY, userId);
+  }
+  
+  return userId;
+}
+
 // Axios 인스턴스 생성 (타임아웃 및 에러 처리 설정)
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -24,9 +45,11 @@ const axiosInstance = axios.create({
   }
 });
 
-// 요청 인터셉터 (에러 로깅)
+// 요청 인터셉터: 모든 요청에 userId 헤더 자동 추가 및 로깅
 axiosInstance.interceptors.request.use(
   (config) => {
+    const userId = getOrCreateUserId();
+    config.headers['x-user-id'] = userId;
     console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
@@ -186,6 +209,124 @@ export const api = {
       return response.data;
     } catch (error: any) {
       console.error('getPreviewQuota error:', error);
+      throw error;
+    }
+  },
+
+  // Quota 조회
+  getQuota: async (): Promise<{
+    ok: boolean;
+    plan: 'FREE' | 'PRO';
+    quota: {
+      limitRequests: number;
+      usedRequests: number;
+      limitChars: number;
+      usedChars: number;
+      resetAt: string;
+    };
+  }> => {
+    try {
+      const response = await axiosInstance.get('/quota');
+      return response.data;
+    } catch (error: any) {
+      console.error('getQuota error:', error);
+      throw error;
+    }
+  },
+
+  // 결제 Checkout 세션 생성
+  createCheckout: async (type: string): Promise<{ ok: boolean; url: string }> => {
+    try {
+      const response = await axiosInstance.post('/billing/checkout', { type });
+      return response.data;
+    } catch (error: any) {
+      console.error('createCheckout error:', error);
+      throw error;
+    }
+  },
+
+  // TTS 미리듣기 오디오 가져오기 (Google Chirp 3 HD)
+  fetchPreviewAudio: async (params: {
+    text: string;
+    voice?: string;
+    rate?: number;
+    pitch?: number;
+    audienceLevelId?: string;  // 연령대
+    relationshipId?: string;   // 관계
+  }): Promise<Blob> => {
+    try {
+      const response = await axiosInstance.post(
+        '/tts/preview',
+        params,
+        { 
+          responseType: 'blob',
+          validateStatus: (status) => status < 500 // 4xx는 catch에서 처리
+        }
+      );
+
+      // Content-Type 확인
+      const contentType = response.headers['content-type'] || '';
+      console.log('[TTS] Response:', {
+        status: response.status,
+        contentType: contentType,
+        size: response.data?.size || 0
+      });
+
+      // 응답이 성공이 아니면 JSON 에러로 처리
+      if (response.status !== 200) {
+        // Blob을 텍스트로 변환하여 JSON 파싱 시도
+        const errorText = await response.data.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText || 'Unknown error' };
+        }
+        
+        console.error('[TTS] Error response:', {
+          status: response.status,
+          error: errorData
+        });
+
+        // 501 (TTS_NOT_CONFIGURED)는 특별 처리
+        if (response.status === 501) {
+          const error = new Error(errorData.message || 'TTS service is not configured');
+          (error as any).code = 'TTS_NOT_CONFIGURED';
+          (error as any).status = 501;
+          throw error;
+        }
+
+        throw new Error(errorData.message || `TTS 생성 실패: HTTP ${response.status}`);
+      }
+
+      // Content-Type이 audio/*가 아니면 에러
+      if (!contentType.startsWith('audio/')) {
+        const errorText = await response.data.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: 'Invalid response: not audio' };
+        }
+        
+        console.error('[TTS] Invalid content-type:', {
+          contentType: contentType,
+          response: errorData
+        });
+        
+        throw new Error(errorData.message || '서버가 오디오가 아닌 응답을 반환했습니다.');
+      }
+
+      // 정상적인 오디오 Blob 반환
+      return response.data;
+    } catch (error: any) {
+      console.error('[TTS] fetchPreviewAudio error:', {
+        message: error.message,
+        code: error.code,
+        status: error.status || error.response?.status
+      });
+      
+      // 에러를 그대로 전파 (폴백은 호출 측에서 처리)
       throw error;
     }
   },

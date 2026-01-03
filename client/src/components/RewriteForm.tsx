@@ -78,6 +78,21 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
   const [selectedRelationship, setSelectedRelationship] = useState<string>('');
   const [selectedLength, setSelectedLength] = useState<LengthOption>(LengthOption.STANDARD);
   const [selectedFormat, setSelectedFormat] = useState<FormatOption>(FormatOption.MESSAGE);
+
+  // 연령대에 따라 선택 가능한 관계 필터링
+  const getAvailableRelationships = (audienceLevelId: string): Relationship[] => {
+    // 학생(초등/중학/고등)은 친구, 선생님만 가능
+    const studentLevels = ['elementary1', 'elementary', 'middle', 'high'];
+    if (studentLevels.includes(audienceLevelId)) {
+      return relationships.filter(rel => rel.id === 'friend' || rel.id === 'teacher');
+    }
+    // 성인/시니어는 모든 관계 가능
+    return relationships;
+  };
+
+  const availableRelationships = selectedAudience 
+    ? getAvailableRelationships(selectedAudience)
+    : relationships;
   
   // englishHelperMode: localStorage에서 초기값 로드, 변경 시 저장
   const [englishHelperMode, setEnglishHelperMode] = useState<EnglishHelperMode>(() => {
@@ -131,9 +146,11 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
       if (purposes.length > 0) {
         setSelectedPurpose(purposes[0].id);
       }
-      if (tones.length > 0) {
+      if (Array.isArray(tones) && tones.length > 0) {
         setSelectedTone(tones[0].id);
-        setStrength({ softToFirm: tones[0].defaultStrength.softToFirm });
+        if (tones[0].defaultStrength) {
+          setStrength({ softToFirm: tones[0].defaultStrength.softToFirm });
+        }
       }
       if (audience.length > 0) {
         setSelectedAudience(audience[audience.length - 1].id); // 성인 기본
@@ -149,9 +166,11 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
 
   const handleToneChange = (toneId: string) => {
     setSelectedTone(toneId);
-    const tone = tonePresets.find(t => t.id === toneId);
-    if (tone) {
-      setStrength({ softToFirm: tone.defaultStrength.softToFirm });
+    if (Array.isArray(tonePresets)) {
+      const tone = tonePresets.find(t => t.id === toneId);
+      if (tone && tone.defaultStrength) {
+        setStrength({ softToFirm: tone.defaultStrength.softToFirm });
+      }
     }
   };
 
@@ -187,9 +206,13 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
     // 저장은 useEffect가 처리
   };
 
-  // 기본 톤과 특수 톤 분리
-  const baseTones = tonePresets.filter(t => t.category === 'base' || t.category === 'apology');
-  const specialTones = tonePresets.filter(t => t.category === 'strong' || t.id === 'notice-formal');
+  // 기본 톤과 특수 톤 분리 (안전장치: 배열이 아닌 경우 빈 배열 반환)
+  const baseTones = Array.isArray(tonePresets) 
+    ? tonePresets.filter(t => t.category === 'base' || t.category === 'apology')
+    : [];
+  const specialTones = Array.isArray(tonePresets)
+    ? tonePresets.filter(t => t.category === 'strong' || t.id === 'notice-formal')
+    : [];
 
   // 프리셋 로딩 중이거나 에러가 있으면 표시
   if (loadingPresets) {
@@ -285,7 +308,15 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
         <select
           className="form-select"
           value={selectedAudience}
-          onChange={(e) => setSelectedAudience(e.target.value)}
+          onChange={(e) => {
+            const newAudience = e.target.value;
+            setSelectedAudience(newAudience);
+            // 연령대 변경 시 선택된 관계가 유효하지 않으면 초기화
+            const newAvailableRelationships = getAvailableRelationships(newAudience);
+            if (selectedRelationship && !newAvailableRelationships.find(r => r.id === selectedRelationship)) {
+              setSelectedRelationship('');
+            }
+          }}
           required
         >
           {audienceLevels.map((level) => (
@@ -302,14 +333,23 @@ const RewriteForm: React.FC<RewriteFormProps> = ({
           className="form-select"
           value={selectedRelationship}
           onChange={(e) => setSelectedRelationship(e.target.value)}
+          disabled={!selectedAudience}
         >
           <option value="">{t('form.relationshipNone')}</option>
-          {relationships.map((rel) => (
+          {availableRelationships.map((rel) => (
             <option key={rel.id} value={rel.id}>
               {rel.label}
             </option>
           ))}
         </select>
+        {selectedAudience && availableRelationships.length < relationships.length && (
+          <small style={{ display: 'block', marginTop: '4px', color: '#666', fontSize: '12px' }}>
+            {selectedAudience === 'elementary1' || selectedAudience === 'elementary' || 
+             selectedAudience === 'middle' || selectedAudience === 'high'
+              ? '학생은 친구, 선생님만 선택 가능합니다.'
+              : ''}
+          </small>
+        )}
       </Section>
 
       {/* 길이 */}

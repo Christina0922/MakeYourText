@@ -9,6 +9,7 @@ import TemplateResults from './components/TemplateResults';
 import SafetyWarning from './components/SafetyWarning';
 import PlanBadge from './components/PlanBadge';
 import LanguageSelector from './components/LanguageSelector';
+import PaywallModal from './components/PaywallModal';
 import './App.css';
 
 // DEV 모드: 개발/테스트 단계에서는 항상 PRO로 동작
@@ -27,6 +28,12 @@ function App() {
   const [templateResults, setTemplateResults] = useState<TemplateResult[]>([]);
   const [isGeneratingTemplates, setIsGeneratingTemplates] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallQuota, setPaywallQuota] = useState<any>(null);
+  const [lastRequest, setLastRequest] = useState<{
+    audienceLevelId?: string;
+    relationshipId?: string;
+  } | null>(null);
 
   const handleSubmit = async (request: {
     text: string;
@@ -106,8 +113,38 @@ function App() {
         // ✅ englishHelperMode를 payload에 반드시 포함
         englishHelperMode: request.englishHelperMode || EnglishHelperMode.OFF
       };
-      const response = await api.rewrite(rewriteRequest);
-      setResult(response);
+      const response = await api.rewrite(rewriteRequest) as any; // 서버 응답 형식이 다양할 수 있음
+      // 서버 응답이 safety와 variants 필드를 포함하지 않을 수 있으므로 기본값 설정
+      // 서버가 { text, ... } 형식으로 반환하면 variants로 변환
+      let resultWithSafety: RewriteResult;
+      if (response.variants && Array.isArray(response.variants)) {
+        // 이미 variants가 있는 경우
+        resultWithSafety = {
+          variants: response.variants,
+          safety: response.safety || { blocked: false },
+          templateResults: response.templateResults
+        };
+      } else if (response.text && typeof response.text === 'string') {
+        // text만 있는 경우 variants로 변환
+        resultWithSafety = {
+          variants: [{ type: 'standard' as const, text: response.text }],
+          safety: response.safety || { blocked: false },
+          templateResults: response.templateResults
+        };
+      } else {
+        // 기본값
+        resultWithSafety = {
+          variants: [],
+          safety: { blocked: false },
+          templateResults: response.templateResults
+        };
+      }
+      setResult(resultWithSafety);
+      // 연령대와 관계 정보 저장 (TTS에 사용)
+      setLastRequest({
+        audienceLevelId: request.audienceLevelId,
+        relationshipId: request.relationshipId
+      });
     } catch (err: any) {
       // 400 에러 처리 (text가 비어있는 경우)
       const errorMessage = err.response?.data?.reason || err.message || t('error.rewriteFailed');
@@ -202,11 +239,11 @@ function App() {
           </div>
         )}
 
-        {result && result.safety.blocked && (
+        {result && result.safety && result.safety.blocked && (
           <SafetyWarning safety={result.safety} />
         )}
 
-        {result && !result.safety.blocked && result.variants.length > 0 && (
+        {result && (!result.safety || !result.safety.blocked) && result.variants && result.variants.length > 0 && (
           <RewriteResultComponent
             variants={result.variants}
             plan={effectivePlan}
@@ -214,14 +251,23 @@ function App() {
             onSave={handleSave}
             isDev={IS_DEV}
             englishHelperMode={englishHelperMode}
+            audienceLevelId={lastRequest?.audienceLevelId}
+            relationshipId={lastRequest?.relationshipId}
           />
         )}
 
-        {result && !result.safety.blocked && result.variants.length === 0 && (
+        {result && (!result.safety || !result.safety.blocked) && (!result.variants || result.variants.length === 0) && (
           <div className="no-results">
             {t('error.noResults')}
           </div>
         )}
+
+        <PaywallModal
+          isOpen={showPaywall}
+          onClose={() => setShowPaywall(false)}
+          quota={paywallQuota}
+          message="무료 사용량을 모두 사용하셨습니다. 업그레이드하면 즉시 계속 사용 가능합니다."
+        />
       </main>
     </div>
   );

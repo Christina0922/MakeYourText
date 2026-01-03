@@ -181,118 +181,16 @@ function getUserIdentifier(req: express.Request): UserIdentifier {
 /**
  * POST /api/tts/preview
  * 미리듣기 전용 API (한도 검사 포함)
+ * 
+ * 주의: 이 엔드포인트는 index.ts의 /api/tts/preview로 대체되었습니다.
+ * 이 라우터가 등록되어 있다면 충돌을 방지하기 위해 이 핸들러는 비활성화합니다.
  */
-router.post('/preview', async (req, res) => {
-  try {
-    const {
-      text,
-      voicePreset,
-      rate,
-      pitch,
-      emotion,
-      language = 'ko-KR',
-      plan = Plan.FREE, // 클라이언트에서 전달
-    } = req.body;
-
-    if (!text || !voicePreset) {
-      return res.status(400).json({
-        error: 'Missing required parameters: text, voicePreset',
-        errorCode: 'INVALID_REQUEST',
-      });
-    }
-
-    // 사용자 식별자 추출
-    const identifier = getUserIdentifier(req);
-    
-    // 한도 검사
-    const quotaCheck = checkPreviewQuota(identifier, plan, text);
-    
-    if (!quotaCheck.allowed) {
-      return res.status(403).json({
-        error: quotaCheck.message || '미리듣기 한도를 초과했습니다.',
-        errorCode: quotaCheck.errorCode,
-        upgradeRequired: quotaCheck.upgradeRequired,
-        remainingCount: quotaCheck.remainingCount,
-        limitCount: quotaCheck.limitCount,
-        resetAt: quotaCheck.resetAt,
-      });
-    }
-
-    // 보이스 프리셋 확인
-    const preset = VOICE_PRESETS.find(v => v.id === voicePreset);
-    if (!preset) {
-      return res.status(400).json({
-        error: 'Invalid voice preset',
-        errorCode: 'INVALID_REQUEST',
-      });
-    }
-
-    // 텍스트 전처리 (낭독용으로 변환)
-    const processedText = preprocessTextForSSML(text);
-
-    // SSML 생성
-    const ssmlRate = Math.max(0.8, Math.min(1.2, rate || 1.0));
-    const pitchValue = pitch || 50;
-    const ssmlPitch = ((pitchValue - 50) / 50) * 10;
-    const emotionValue = emotion || 50;
-    const ssmlVolume = 0.7 + (emotionValue / 333);
-    
-    let adjustedRate = ssmlRate;
-    if (emotionValue > 70) {
-      adjustedRate = Math.min(1.2, ssmlRate + 0.1);
-    } else if (emotionValue < 30) {
-      adjustedRate = Math.max(0.8, ssmlRate - 0.1);
-    }
-
-    const ssml = `
-      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}">
-        <voice name="${getVoiceName(preset)}">
-          <prosody rate="${adjustedRate}" pitch="${ssmlPitch > 0 ? '+' : ''}${ssmlPitch.toFixed(1)}%" volume="${ssmlVolume.toFixed(2)}">
-            ${processedText}
-          </prosody>
-        </voice>
-      </speak>
-    `.trim();
-
-    // 실제 TTS 서비스 호출 (예: Google Cloud TTS, Azure TTS, AWS Polly 등)
-    // TODO: 실제 TTS 서비스 연동
-    // 예: const audioBuffer = await ttsService.synthesize(ssml);
-    
-    // 사용량 증가 (성공 시에만)
-    incrementPreviewUsage(identifier);
-    
-    // 현재 사용량 조회
-    const usage = getPreviewUsage(identifier, plan);
-    
-    // 임시로 에러 반환 (실제 TTS 서비스 연동 필요)
-    // 실제 구현 시에는 audio/mpeg로 응답
-    res.status(501).json({
-      error: 'Server TTS not implemented yet',
-      message: 'Please use browser TTS for now. Set REACT_APP_USE_SERVER_TTS=false',
-      ssml: ssml, // 디버깅용
-      quota: {
-        remainingCount: usage.remainingCount,
-        limitCount: usage.limitCount,
-        resetAt: usage.resetAt,
-      },
-    });
-
-    // 실제 구현 시:
-    // res.setHeader('Content-Type', 'audio/mpeg');
-    // res.send(audioBuffer);
-  } catch (error: any) {
-    console.error('Preview TTS error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      errorCode: 'INTERNAL_ERROR',
-      message: error.message,
-    });
-  }
-});
+// router.post('/preview', ...) - 비활성화: index.ts에서 처리
 
 /**
  * GET /api/tts/preview/quota
  * 현재 사용자의 미리듣기 한도 정보 조회
+ * x-user-id 헤더가 없으면 서버가 anon userId를 생성하여 처리
  */
 router.get('/preview/quota', async (req, res) => {
   try {

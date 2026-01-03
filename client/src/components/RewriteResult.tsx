@@ -4,6 +4,7 @@ import { RewriteVariant, VoicePreset, VoiceControls, Plan, EnglishHelperMode, Pr
 import { api } from '../services/api';
 import { ttsProvider } from '../services/tts';
 import { requestPreview, getPreviewQuota, trackPreviewEvent } from '../services/previewService';
+import { fetchPreviewAudio, playAudioBlob } from '../utils/tts';
 import PreviewQuotaDisplay from './PreviewQuotaDisplay';
 import UpgradeModal from './UpgradeModal';
 import './RewriteResult.css';
@@ -15,6 +16,8 @@ interface RewriteResultProps {
   onSave: (text: string) => void;
   isDev?: boolean;
   englishHelperMode?: EnglishHelperMode; // 영어 도우미 모드 추가
+  audienceLevelId?: string;  // 연령대 (초등 저학년, 중학생, 성인, 시니어 등)
+  relationshipId?: string;   // 관계 (친구, 선생님, 상사 등)
 }
 
 // 슬라이더 범위 상수 정의 (통일된 범위)
@@ -28,7 +31,9 @@ const RewriteResultComponent: React.FC<RewriteResultProps> = ({
   onCopy,
   onSave,
   isDev = false,
-  englishHelperMode = EnglishHelperMode.OFF
+  englishHelperMode = EnglishHelperMode.OFF,
+  audienceLevelId,
+  relationshipId
 }) => {
   const { t } = useTranslation();
   const [voicePresets, setVoicePresets] = useState<VoicePreset[]>([]);
@@ -209,11 +214,61 @@ const RewriteResultComponent: React.FC<RewriteResultProps> = ({
         return;
       }
 
-      // 한도 검사 통과 - 실제 TTS 재생
-      await ttsProvider.speak(variant.text, voice, controls, englishHelperMode);
-      
-      // 성공 이벤트 기록
-      trackPreviewEvent('preview_success', { plan, variantType: variant.type });
+      // 한도 검사 통과 - 서버 TTS로 오디오 생성 및 재생
+      try {
+        // 서버 TTS API 호출 (Google Chirp 3 HD)
+        // rate: 0.8-1.2를 0.87 기준으로 조정 (더 느리고 자연스럽게)
+        const serverRate = controls.rate ? Math.max(0.75, Math.min(1.05, controls.rate * 0.87)) : 0.87;
+        // pitch: 0-100을 -5~+3 semitones로 변환 (더 자연스러운 범위)
+        const serverPitch = controls.pitch ? ((controls.pitch - 50) / 50) * 4 - 2 : -2;
+        
+        const audioBlob = await fetchPreviewAudio(variant.text, {
+          voice: voice.id, // 보이스 ID 전달
+          rate: serverRate,
+          pitch: serverPitch,
+          audienceLevelId: audienceLevelId,  // 연령대 전달
+          relationshipId: relationshipId      // 관계 전달
+        });
+
+        // 오디오 재생
+        await playAudioBlob(audioBlob);
+        
+        // 성공 이벤트 기록
+        trackPreviewEvent('preview_success', { plan, variantType: variant.type });
+      } catch (ttsError: any) {
+        // 501 (TTS_NOT_CONFIGURED)일 때만 개발용 폴백 허용
+        if (ttsError.code === 'TTS_NOT_CONFIGURED' || ttsError.status === 501) {
+          console.warn('[TTS] TTS not configured, using Web Speech API as fallback:', ttsError.message);
+          try {
+            await ttsProvider.speak(variant.text, voice, controls, englishHelperMode);
+            trackPreviewEvent('preview_success', { plan, variantType: variant.type, fallback: true });
+          } catch (fallbackError: any) {
+            setError(prev => ({
+              ...prev,
+              [variant.type]: 'TTS 서비스가 설정되지 않았고, 브라우저 TTS도 사용할 수 없습니다.'
+            }));
+            trackPreviewEvent('preview_failed', {
+              plan,
+              errorCode: 'TTS_NOT_CONFIGURED',
+              variantType: variant.type,
+            });
+          }
+        } else {
+          // 기타 에러는 폴백하지 않고 에러 표시
+          console.error('[TTS] Server TTS failed:', ttsError);
+          const errorMessage = ttsError.message || 'TTS 생성에 실패했습니다.';
+          setError(prev => ({
+            ...prev,
+            [variant.type]: errorMessage
+          }));
+          trackPreviewEvent('preview_failed', {
+            plan,
+            errorCode: 'TTS_ERROR',
+            variantType: variant.type,
+            error: errorMessage
+          });
+        }
+      }
       
       // 한도 정보 업데이트
       if (previewResult.quota) {
@@ -245,7 +300,10 @@ const RewriteResultComponent: React.FC<RewriteResultProps> = ({
   };
 
   const handleSentencePlay = async (variant: RewriteVariant, sentence: string) => {
-    // 현재 슬라이더 값을 반드시 읽어서 사용
+    if (!sentence || !sentence.trim()) {
+      return;
+    }
+
     const voiceId = selectedVoices[variant.type] || voicePresets[0]?.id;
     const controls = voiceControls[variant.type] || {
       rate: SPEED_RANGE.default,
@@ -253,17 +311,65 @@ const RewriteResultComponent: React.FC<RewriteResultProps> = ({
       emotion: EMOTION_RANGE.default
     };
 
-    if (!voiceId || !ttsProvider.isSupported()) return;
-    
+    if (!voiceId) {
+      setError(prev => ({ ...prev, [variant.type]: '보이스를 선택해주세요.' }));
+      return;
+    }
+
     const voice = voicePresets.find(v => v.id === voiceId);
-    if (!voice) return;
-    
+    if (!voice) {
+      setError(prev => ({ ...prev, [variant.type]: '보이스를 찾을 수 없습니다.' }));
+      return;
+    }
+
+    setPlaying(prev => ({ ...prev, [variant.type]: true }));
+    setLoading(prev => ({ ...prev, [variant.type]: true }));
+    setError(prev => ({ ...prev, [variant.type]: null }));
+
     try {
-      await ttsProvider.speak(sentence.trim(), voice, controls, englishHelperMode);
-    } catch (error) {
-      console.error('TTS error:', error);
+      // 서버 TTS로 문장 재생 (미리듣기와 동일한 방식)
+      const serverRate = controls.rate ? Math.max(0.75, Math.min(1.05, controls.rate * 0.87)) : 0.87;
+      const serverPitch = controls.pitch ? ((controls.pitch - 50) / 50) * 4 - 2 : -2;
+      
+      const audioBlob = await fetchPreviewAudio(sentence.trim(), {
+        voice: voice.id,
+        rate: serverRate,
+        pitch: serverPitch,
+        audienceLevelId: audienceLevelId,
+        relationshipId: relationshipId
+      });
+
+      await playAudioBlob(audioBlob);
+      
+      trackPreviewEvent('preview_success', { plan, variantType: variant.type, sentence: true });
+    } catch (ttsError: any) {
+      // 501 (TTS_NOT_CONFIGURED)일 때만 개발용 폴백 허용
+      if (ttsError.code === 'TTS_NOT_CONFIGURED' || ttsError.status === 501) {
+        console.warn('[TTS] TTS not configured, using Web Speech API as fallback:', ttsError.message);
+        try {
+          await ttsProvider.speak(sentence.trim(), voice, controls, englishHelperMode);
+          trackPreviewEvent('preview_success', { plan, variantType: variant.type, sentence: true, fallback: true });
+        } catch (fallbackError: any) {
+          setError(prev => ({
+            ...prev,
+            [variant.type]: 'TTS 서비스가 설정되지 않았고, 브라우저 TTS도 사용할 수 없습니다.'
+          }));
+        }
+      } else {
+        // 기타 에러는 폴백하지 않고 에러 표시
+        console.error('[TTS] Server TTS failed:', ttsError);
+        const errorMessage = ttsError.message || 'TTS 생성에 실패했습니다.';
+        setError(prev => ({
+          ...prev,
+          [variant.type]: errorMessage
+        }));
+      }
+    } finally {
+      setPlaying(prev => ({ ...prev, [variant.type]: false }));
+      setLoading(prev => ({ ...prev, [variant.type]: false }));
     }
   };
+
 
   const getVariantLabel = (type: string) => {
     switch (type) {
